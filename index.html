@@ -578,7 +578,9 @@ function handleData(data){
 
         opponentName = data.hostName;
 
-        startGame();
+    questions = data.questions;
+
+    startGame();
 
     }
 
@@ -634,7 +636,9 @@ function startGame(){
 
             type:"start",
 
-            hostName:myName
+            hostName:myName,
+
+            questions:questions
 
         });
 
