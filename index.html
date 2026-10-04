@@ -336,7 +336,7 @@ const shuffledWordBank = [...wordBank]
     .sort(() => Math.random() - 0.5)
     .slice(0, 10);
 
-const questions = shuffledWordBank.map(item => {
+let questions = shuffledWordBank.map(item => {
 
     const wrongAnswers = wordBank
         .filter(x => x.uzbek !== item.uzbek)
