@@ -786,12 +786,10 @@ function answerQuestion(answer, button){
 
     if(answered) return;
 
-    answered = true;
+   answered = true;
 
-    clearInterval(timer);
-
-    const correct =
-        questions[currentQuestion].correct === answer;
+const correct =
+    questions[currentQuestion].correct === answer;
 
 
     if(correct){
