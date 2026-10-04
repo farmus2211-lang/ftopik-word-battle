@@ -818,7 +818,6 @@ function answerQuestion(answer, button){
 
     updateScores();
 
-    // Guest o'z natijasini Host'ga yuboradi
     if(!isHost){
 
         connection.send({
@@ -829,57 +828,6 @@ function answerQuestion(answer, button){
 
     }
 
-    // Host ikkala o'yinchining javobini kuzatadi
-    if(isHost){
-
-        hostAnswered = true;
-
-        checkBothAnswered();
-
-    }
-}
-
-}
-
-function answerQuestion(answer, button){
-
-    if(answered) return;
-
-    answered = true;
-
-    const correct =
-        questions[currentQuestion].correct === answer;
-
-    if(correct){
-
-        button.classList.add("correct");
-
-        myScore += 10;
-
-    }else{
-
-        button.classList.add("wrong");
-
-        myScore += 0;
-
-    }
-
-    disableAnswers();
-
-    updateScores();
-
-    // Guest javobini Host'ga yuboradi
-    if(!isHost){
-
-        connection.send({
-            type:"score",
-            score:myScore,
-            question:currentQuestion
-        });
-
-    }
-
-    // Host o'z javobini belgilaydi
     if(isHost){
 
         hostAnswered = true;
