@@ -841,15 +841,66 @@ function answerQuestion(answer, button){
 
 }
 
+function answerQuestion(answer, button){
+
+    if(answered) return;
+
+    answered = true;
+
+    const correct =
+        questions[currentQuestion].correct === answer;
+
+    if(correct){
+
+        button.classList.add("correct");
+
+        myScore += 10;
+
+    }else{
+
+        button.classList.add("wrong");
+
+        myScore += 0;
+
+    }
+
+    disableAnswers();
+
+    updateScores();
+
+    // Guest javobini Host'ga yuboradi
+    if(!isHost){
+
+        connection.send({
+            type:"score",
+            score:myScore,
+            question:currentQuestion
+        });
+
+    }
+
+    // Host o'z javobini belgilaydi
+    if(isHost){
+
+        hostAnswered = true;
+
+        checkBothAnswered();
+
+    }
+}
+
+
 function checkBothAnswered(){
 
     if(hostAnswered && guestAnswered){
+
+        clearInterval(timer);
 
         setTimeout(function(){
 
             nextQuestion();
 
-        }, 500);
+        },500);
 
     }
 }
