@@ -410,6 +410,8 @@ let opponentScore = 0;
 
 let currentQuestion = 0;
 let answered = false;
+let hostAnswered = false;
+let guestAnswered = false;
 
 let timer = null;
 let timeLeft = 15;
@@ -623,11 +625,15 @@ function handleData(data){
 
     if(data.type === "score"){
 
-        opponentScore = data.score;
+    opponentScore = data.score;
 
-        updateScores();
+    guestAnswered = true;
 
-    }
+    updateScores();
+
+    checkBothAnswered();
+
+}
 
 
     if(data.type === "next"){
@@ -694,6 +700,9 @@ function startGame(){
 function showQuestion(){
 
     answered = false;
+    
+    hostAnswered = false;
+    guestAnswered = false;
 
     clearInterval(timer);
 
@@ -786,11 +795,10 @@ function answerQuestion(answer, button){
 
     if(answered) return;
 
-   answered = true;
+    answered = true;
 
-const correct =
-    questions[currentQuestion].correct === answer;
-
+    const correct =
+        questions[currentQuestion].correct === answer;
 
     if(correct){
 
@@ -810,22 +818,41 @@ const correct =
 
     updateScores();
 
-
+    // Guest o'z natijasini Host'ga yuboradi
     if(!isHost){
 
         connection.send({
-
             type:"score",
-
-            score:myScore
-
+            score:myScore,
+            question:currentQuestion
         });
 
     }
 
+    // Host ikkala o'yinchining javobini kuzatadi
+    if(isHost){
+
+        hostAnswered = true;
+
+        checkBothAnswered();
+
+    }
 }
 
+}
 
+function checkBothAnswered(){
+
+    if(hostAnswered && guestAnswered){
+
+        setTimeout(function(){
+
+            nextQuestion();
+
+        }, 500);
+
+    }
+}
 /* =========================
    DISABLE ANSWERS
 ========================= */
