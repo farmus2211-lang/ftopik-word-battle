@@ -712,28 +712,30 @@ function showQuestion(){
     document.getElementById("word").textContent =
         q.word;
 
-    const answersBox =
-        document.getElementById("answers");
+   const answersBox =
+    document.getElementById("answers");
 
-    answersBox.innerHTML = "";
+answersBox.innerHTML = "";
 
-    q.answers.forEach(answer => {
+const shuffledAnswers = [...q.answers].sort(() => Math.random() - 0.5);
 
-        const btn = document.createElement("button");
+shuffledAnswers.forEach(answer => {
 
-        btn.className = "answer";
+    const btn = document.createElement("button");
 
-        btn.textContent = answer;
+    btn.className = "answer";
 
-        btn.onclick = function(){
+    btn.textContent = answer;
 
-            answerQuestion(answer, btn);
+    btn.onclick = function(){
 
-        };
+        answerQuestion(answer, btn);
 
-        answersBox.appendChild(btn);
+    };
 
-    });
+    answersBox.appendChild(btn);
+
+});
 
 
     timeLeft = 15;
