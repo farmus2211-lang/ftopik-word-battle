@@ -1,19 +1,491 @@
 <!DOCTYPE html>
 <html lang="uz">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>F-TOPIK Word Battle</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>F-TOPIK Word Battle</title>
+
+<style>
+
+*{
+    box-sizing:border-box;
+}
+
+body{
+    margin:0;
+    min-height:100vh;
+    font-family:Arial,sans-serif;
+    background:linear-gradient(135deg,#24104f,#4b1b87,#2563eb);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:white;
+}
+
+.game{
+    width:95%;
+    max-width:850px;
+    background:rgba(255,255,255,.12);
+    backdrop-filter:blur(15px);
+    border-radius:25px;
+    padding:30px;
+    box-shadow:0 20px 60px rgba(0,0,0,.3);
+}
+
+.logo{
+    text-align:center;
+    font-size:32px;
+    font-weight:800;
+    margin-bottom:25px;
+}
+
+.logo span{
+    color:#d8b4fe;
+}
+
+h2{
+    text-align:center;
+}
+
+input{
+    width:100%;
+    padding:15px;
+    border:0;
+    border-radius:12px;
+    margin:7px 0;
+    font-size:17px;
+}
+
+button{
+    width:100%;
+    padding:15px;
+    margin-top:10px;
+    border:0;
+    border-radius:12px;
+    font-size:17px;
+    font-weight:bold;
+    cursor:pointer;
+}
+
+.create{
+    background:#a855f7;
+    color:white;
+}
+
+.join{
+    background:#2563eb;
+    color:white;
+}
+
+.players{
+    display:flex;
+    gap:15px;
+}
+
+.player{
+    flex:1;
+    text-align:center;
+    padding:15px;
+    background:rgba(255,255,255,.12);
+    border-radius:18px;
+}
+
+.score{
+    font-size:36px;
+    font-weight:800;
+}
+
+.code{
+    text-align:center;
+    font-size:32px;
+    font-weight:bold;
+    letter-spacing:5px;
+    background:rgba(0,0,0,.25);
+    padding:15px;
+    border-radius:15px;
+    margin:20px 0;
+}
+
+.word{
+    text-align:center;
+    font-size:60px;
+    font-weight:800;
+    margin:40px 0;
+}
+
+.answers{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:15px;
+}
+
+.answer{
+    background:white;
+    color:#222;
+}
+
+.hidden{
+    display:none;
+}
+
+.status{
+    text-align:center;
+    margin:20px 0;
+}
+
+@media(max-width:600px){
+
+    .game{
+        padding:18px;
+    }
+
+    .answers{
+        grid-template-columns:1fr;
+    }
+
+    .word{
+        font-size:45px;
+    }
+
+}
+
+</style>
 </head>
 
 <body>
 
-<h1>F-TOPIK WORD BATTLE</h1>
+<div class="game">
 
-<p>Online 1 vs 1 koreyscha so‘z o‘yini</p>
+<div class="logo">
+F-<span>TOPIK</span> WORD BATTLE
+</div>
 
-<button>🏠 Xona yaratish</button>
-<button>🚀 Xonaga qo‘shilish</button>
+<!-- START -->
+
+<div id="start">
+
+<h2>🎮 1 vs 1 Online Word Game</h2>
+
+<input id="name" placeholder="Ismingiz">
+
+<button class="create" onclick="createRoom()">
+🏠 Xona yaratish
+</button>
+
+<input id="room" placeholder="Xona kodini kiriting">
+
+<button class="join" onclick="joinRoom()">
+🚀 Xonaga qo‘shilish
+</button>
+
+<div id="status" class="status"></div>
+
+</div>
+
+
+<!-- WAITING -->
+
+<div id="waiting" class="hidden">
+
+<h2>👥 Raqib kutilmoqda</h2>
+
+<div id="roomCode" class="code"></div>
+
+<div class="status">
+Ushbu kodni ikkinchi o‘yinchiga yuboring.
+</div>
+
+</div>
+
+
+<!-- GAME -->
+
+<div id="game" class="hidden">
+
+<div class="players">
+
+<div class="player">
+
+<div id="p1">
+Player 1
+</div>
+
+<div id="s1" class="score">
+0
+</div>
+
+</div>
+
+
+<div class="player">
+
+<div id="p2">
+Player 2
+</div>
+
+<div id="s2" class="score">
+0
+</div>
+
+</div>
+
+</div>
+
+<div class="status">
+Savol <span id="number">1</span> / 10
+</div>
+
+<div id="word" class="word">
+학교
+</div>
+
+<div id="answers" class="answers"></div>
+
+<div id="gameStatus" class="status"></div>
+
+</div>
+
+
+<!-- RESULT -->
+
+<div id="result" class="hidden">
+
+<h2>🏆 O‘yin tugadi!</h2>
+
+<div id="winner" class="status"></div>
+
+<button onclick="location.reload()">
+🔄 Qayta o‘ynash
+</button>
+
+</div>
+
+</div>
+
+
+<script>
+
+const questions=[
+
+{
+word:"학교",
+answers:["Maktab","Universitet","Kasalxona","Bank"],
+correct:0
+},
+
+{
+word:"친구",
+answers:["Oila","Do‘st","Ustoz","Talaba"],
+correct:1
+},
+
+{
+word:"가족",
+answers:["Oila","Do‘st","Qo‘shni","Hamkasb"],
+correct:0
+},
+
+{
+word:"사랑",
+answers:["Baxt","Sevgi","Qo‘rquv","Orzu"],
+correct:1
+},
+
+{
+word:"공부",
+answers:["O‘qish","Ish","Sayohat","Sport"],
+correct:0
+},
+
+{
+word:"음식",
+answers:["Ovqat","Ichimlik","Meva","Suv"],
+correct:0
+},
+
+{
+word:"병원",
+answers:["Maktab","Bank","Kasalxona","Restoran"],
+correct:2
+},
+
+{
+word:"여행",
+answers:["Sayohat","Sport","O‘yin","Ish"],
+correct:0
+},
+
+{
+word:"날씨",
+answers:["Vaqt","Ob-havo","Joy","Fasl"],
+correct:1
+},
+
+{
+word:"행복",
+answers:["Muammo","Baxt","Qo‘rquv","Xavf"],
+correct:1
+}
+
+];
+
+let myScore=0;
+let question=0;
+
+function createRoom(){
+
+let name=document.getElementById("name").value;
+
+if(!name){
+
+alert("Avval ismingizni kiriting!");
+
+return;
+
+}
+
+let code=Math.random()
+.toString(36)
+.substring(2,8)
+.toUpperCase();
+
+document.getElementById("start")
+.classList.add("hidden");
+
+document.getElementById("waiting")
+.classList.remove("hidden");
+
+document.getElementById("roomCode")
+.innerText=code;
+
+}
+
+function joinRoom(){
+
+let name=document.getElementById("name").value;
+
+let room=document.getElementById("room").value;
+
+if(!name){
+
+alert("Ismingizni kiriting!");
+
+return;
+
+}
+
+if(!room){
+
+alert("Xona kodini kiriting!");
+
+return;
+
+}
+
+document.getElementById("start")
+.classList.add("hidden");
+
+document.getElementById("game")
+.classList.remove("hidden");
+
+startGame();
+
+}
+
+function startGame(){
+
+document.getElementById("p1")
+.innerText="Siz";
+
+showQuestion();
+
+}
+
+function showQuestion(){
+
+if(question>=questions.length){
+
+finish();
+
+return;
+
+}
+
+let q=questions[question];
+
+document.getElementById("number")
+.innerText=question+1;
+
+document.getElementById("word")
+.innerText=q.word;
+
+let box=document.getElementById("answers");
+
+box.innerHTML="";
+
+q.answers.forEach((answer,index)=>{
+
+let button=document.createElement("button");
+
+button.className="answer";
+
+button.innerText=answer;
+
+button.onclick=()=>answerQuestion(index);
+
+box.appendChild(button);
+
+});
+
+}
+
+function answerQuestion(index){
+
+let q=questions[question];
+
+if(index===q.correct){
+
+myScore++;
+
+document.getElementById("gameStatus")
+.innerText="✅ To‘g‘ri!";
+
+}else{
+
+document.getElementById("gameStatus")
+.innerText="❌ Noto‘g‘ri";
+
+}
+
+document.getElementById("s1")
+.innerText=myScore;
+
+setTimeout(()=>{
+
+question++;
+
+showQuestion();
+
+},700);
+
+}
+
+function finish(){
+
+document.getElementById("game")
+.classList.add("hidden");
+
+document.getElementById("result")
+.classList.remove("hidden");
+
+document.getElementById("winner")
+.innerText=
+"Sizning natijangiz: "+myScore+" / "+questions.length;
+
+}
+
+</script>
 
 </body>
 </html>
