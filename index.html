@@ -3,261 +3,327 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F-TOPIK WORD BATTLE</title>
 
-<title>F-TOPIK Word Battle</title>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 
 <style>
-
 *{
     box-sizing:border-box;
 }
 
 body{
     margin:0;
-    min-height:100vh;
-    font-family:Arial,sans-serif;
-    background:linear-gradient(135deg,#24104f,#4b1b87,#2563eb);
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    color:white;
+    font-family:Arial, sans-serif;
+    background:linear-gradient(135deg,#eef0ff,#f7f2ff);
+    color:#222;
 }
 
-.game{
-    width:95%;
-    max-width:850px;
-    background:rgba(255,255,255,.12);
-    backdrop-filter:blur(15px);
-    border-radius:25px;
-    padding:30px;
-    box-shadow:0 20px 60px rgba(0,0,0,.3);
+.container{
+    max-width:650px;
+    margin:auto;
+    padding:20px;
 }
 
 .logo{
     text-align:center;
-    font-size:32px;
-    font-weight:800;
+    font-size:30px;
+    font-weight:900;
+    color:#6c35d9;
+    margin:20px 0 5px;
+}
+
+.subtitle{
+    text-align:center;
+    color:#777;
     margin-bottom:25px;
 }
 
-.logo span{
-    color:#d8b4fe;
-}
-
-h2{
-    text-align:center;
+.card{
+    background:white;
+    border-radius:25px;
+    padding:25px;
+    box-shadow:0 10px 35px rgba(80,40,150,.12);
 }
 
 input{
     width:100%;
     padding:15px;
-    border:0;
+    border:2px solid #ddd;
     border-radius:12px;
-    margin:7px 0;
-    font-size:17px;
+    font-size:16px;
+    margin-bottom:12px;
+    outline:none;
+}
+
+input:focus{
+    border-color:#7546e8;
 }
 
 button{
     width:100%;
     padding:15px;
-    margin-top:10px;
-    border:0;
+    border:none;
     border-radius:12px;
+    background:linear-gradient(135deg,#673de6,#9b45d9);
+    color:white;
     font-size:17px;
     font-weight:bold;
     cursor:pointer;
+    margin-top:8px;
 }
 
-.create{
-    background:#a855f7;
-    color:white;
+button:hover{
+    opacity:.92;
 }
 
-.join{
-    background:#2563eb;
-    color:white;
+.secondary{
+    background:#eee;
+    color:#333;
+}
+
+.room{
+    text-align:center;
+    font-size:38px;
+    font-weight:900;
+    letter-spacing:8px;
+    color:#673de6;
+    padding:15px;
+}
+
+.status{
+    text-align:center;
+    padding:15px;
+    margin:15px 0;
+    border-radius:12px;
+    background:#f3efff;
+    color:#6334c9;
 }
 
 .players{
     display:flex;
-    gap:15px;
+    gap:12px;
+    margin-bottom:20px;
 }
 
 .player{
     flex:1;
-    text-align:center;
+    background:#f6f3ff;
+    border-radius:15px;
     padding:15px;
-    background:rgba(255,255,255,.12);
-    border-radius:18px;
+    text-align:center;
+}
+
+.player-name{
+    font-size:15px;
+    color:#666;
 }
 
 .score{
-    font-size:36px;
-    font-weight:800;
+    font-size:30px;
+    font-weight:900;
+    color:#6b36db;
 }
 
-.code{
+.question-number{
     text-align:center;
-    font-size:32px;
-    font-weight:bold;
-    letter-spacing:5px;
-    background:rgba(0,0,0,.25);
-    padding:15px;
-    border-radius:15px;
-    margin:20px 0;
+    color:#777;
+    margin-bottom:10px;
+}
+
+.timer{
+    height:12px;
+    background:#eee;
+    border-radius:20px;
+    overflow:hidden;
+    margin-bottom:25px;
+}
+
+.timer-bar{
+    height:100%;
+    width:100%;
+    background:linear-gradient(90deg,#7c42ed,#bd42cf);
+    transition:width 1s linear;
 }
 
 .word{
     text-align:center;
-    font-size:60px;
-    font-weight:800;
-    margin:40px 0;
+    font-size:46px;
+    font-weight:900;
+    margin:25px 0;
 }
 
 .answers{
     display:grid;
     grid-template-columns:1fr 1fr;
-    gap:15px;
+    gap:12px;
 }
 
 .answer{
     background:white;
-    color:#222;
+    color:#333;
+    border:2px solid #e2dcef;
+    min-height:65px;
+}
+
+.answer:hover{
+    background:#f5f0ff;
+}
+
+.answer.correct{
+    background:#27ae60;
+    color:white;
+    border-color:#27ae60;
+}
+
+.answer.wrong{
+    background:#e74c3c;
+    color:white;
+    border-color:#e74c3c;
 }
 
 .hidden{
     display:none;
 }
 
-.status{
+.result{
     text-align:center;
-    margin:20px 0;
 }
 
-@media(max-width:600px){
+.trophy{
+    font-size:70px;
+}
 
-    .game{
-        padding:18px;
+.winner{
+    font-size:28px;
+    font-weight:900;
+    color:#673de6;
+    margin:15px 0;
+}
+
+.small{
+    font-size:14px;
+    color:#888;
+    text-align:center;
+    margin-top:15px;
+}
+
+@media(max-width:500px){
+    .word{
+        font-size:38px;
     }
 
     .answers{
         grid-template-columns:1fr;
     }
 
-    .word{
-        font-size:45px;
+    .logo{
+        font-size:25px;
     }
-
 }
-
 </style>
 </head>
 
 <body>
 
-<div class="game">
+<div class="container">
 
-<div class="logo">
-F-<span>TOPIK</span> WORD BATTLE
-</div>
+<div class="logo">🇰🇷 F-TOPIK WORD BATTLE</div>
+<div class="subtitle">1 vs 1 Korean Vocabulary Game</div>
+
 
 <!-- START -->
+<div id="startScreen" class="card">
 
-<div id="start">
+    <h2>🎮 O‘yinni boshlash</h2>
 
-<h2>🎮 1 vs 1 Online Word Game</h2>
+    <input id="nameInput" placeholder="Ismingizni kiriting">
 
-<input id="name" placeholder="Ismingiz">
+    <button onclick="createRoom()">
+        🏠 Xona yaratish
+    </button>
 
-<button class="create" onclick="createRoom()">
-🏠 Xona yaratish
-</button>
+    <hr style="margin:25px 0;border:none;border-top:1px solid #eee">
 
-<input id="room" placeholder="Xona kodini kiriting">
+    <input id="roomInput" placeholder="Xona kodini kiriting">
 
-<button class="join" onclick="joinRoom()">
-🚀 Xonaga qo‘shilish
-</button>
+    <button onclick="joinRoom()">
+        🚀 Xonaga qo‘shilish
+    </button>
 
-<div id="status" class="status"></div>
+    <div class="small">
+        1-o‘yinchi xona yaratadi. 2-o‘yinchi shu kod orqali kiradi.
+    </div>
 
 </div>
 
 
 <!-- WAITING -->
+<div id="waitingScreen" class="card hidden">
 
-<div id="waiting" class="hidden">
+    <h2 style="text-align:center">🏠 Xona yaratildi</h2>
 
-<h2>👥 Raqib kutilmoqda</h2>
+    <p style="text-align:center">
+        Do‘stingizga quyidagi kodni yuboring:
+    </p>
 
-<div id="roomCode" class="code"></div>
+    <div id="roomCode" class="room">------</div>
 
-<div class="status">
-Ushbu kodni ikkinchi o‘yinchiga yuboring.
-</div>
+    <div id="connectionStatus" class="status">
+        ⏳ Ikkinchi o‘yinchi kutilmoqda...
+    </div>
 
 </div>
 
 
 <!-- GAME -->
+<div id="gameScreen" class="card hidden">
 
-<div id="game" class="hidden">
+    <div class="players">
 
-<div class="players">
+        <div class="player">
+            <div id="hostName" class="player-name">Player 1</div>
+            <div id="hostScore" class="score">0</div>
+        </div>
 
-<div class="player">
+        <div class="player">
+            <div id="guestName" class="player-name">Player 2</div>
+            <div id="guestScore" class="score">0</div>
+        </div>
 
-<div id="p1">
-Player 1
-</div>
+    </div>
 
-<div id="s1" class="score">
-0
-</div>
+    <div id="questionNumber" class="question-number">
+        1 / 10
+    </div>
 
-</div>
+    <div class="timer">
+        <div id="timerBar" class="timer-bar"></div>
+    </div>
 
+    <div id="word" class="word">
+        학교
+    </div>
 
-<div class="player">
-
-<div id="p2">
-Player 2
-</div>
-
-<div id="s2" class="score">
-0
-</div>
-
-</div>
-
-</div>
-
-<div class="status">
-Savol <span id="number">1</span> / 10
-</div>
-
-<div id="word" class="word">
-학교
-</div>
-
-<div id="answers" class="answers"></div>
-
-<div id="gameStatus" class="status"></div>
+    <div id="answers" class="answers"></div>
 
 </div>
 
 
 <!-- RESULT -->
+<div id="resultScreen" class="card hidden result">
 
-<div id="result" class="hidden">
+    <div class="trophy">🏆</div>
 
-<h2>🏆 O‘yin tugadi!</h2>
+    <h2>O‘yin tugadi!</h2>
 
-<div id="winner" class="status"></div>
+    <div id="winner" class="winner"></div>
 
-<button onclick="location.reload()">
-🔄 Qayta o‘ynash
-</button>
+    <div id="finalScore"></div>
+
+    <button onclick="location.reload()">
+        🔄 Yana o‘ynash
+    </button>
 
 </div>
 
@@ -266,222 +332,644 @@ Savol <span id="number">1</span> / 10
 
 <script>
 
-const questions=[
+const questions = [
 
 {
-word:"학교",
-answers:["Maktab","Universitet","Kasalxona","Bank"],
-correct:0
+    word:"학교",
+    answers:["Maktab","Universitet","Kasalxona","Kutubxona"],
+    correct:"Maktab"
 },
 
 {
-word:"친구",
-answers:["Oila","Do‘st","Ustoz","Talaba"],
-correct:1
+    word:"친구",
+    answers:["Oila","Do‘st","Ustoz","Qo‘shni"],
+    correct:"Do‘st"
 },
 
 {
-word:"가족",
-answers:["Oila","Do‘st","Qo‘shni","Hamkasb"],
-correct:0
+    word:"가족",
+    answers:["Do‘st","Oila","Ish","Uy"],
+    correct:"Oila"
 },
 
 {
-word:"사랑",
-answers:["Baxt","Sevgi","Qo‘rquv","Orzu"],
-correct:1
+    word:"사랑",
+    answers:["Baxt","Sevgi","Umid","Orzu"],
+    correct:"Sevgi"
 },
 
 {
-word:"공부",
-answers:["O‘qish","Ish","Sayohat","Sport"],
-correct:0
+    word:"공부",
+    answers:["O‘qish","Dam olish","Ishlash","Sayohat"],
+    correct:"O‘qish"
 },
 
 {
-word:"음식",
-answers:["Ovqat","Ichimlik","Meva","Suv"],
-correct:0
+    word:"음식",
+    answers:["Ichimlik","Ovqat","Meva","Sabzavot"],
+    correct:"Ovqat"
 },
 
 {
-word:"병원",
-answers:["Maktab","Bank","Kasalxona","Restoran"],
-correct:2
+    word:"병원",
+    answers:["Maktab","Bank","Kasalxona","Dorixona"],
+    correct:"Kasalxona"
 },
 
 {
-word:"여행",
-answers:["Sayohat","Sport","O‘yin","Ish"],
-correct:0
+    word:"여행",
+    answers:["Sayohat","Sport","Ish","O‘qish"],
+    correct:"Sayohat"
 },
 
 {
-word:"날씨",
-answers:["Vaqt","Ob-havo","Joy","Fasl"],
-correct:1
+    word:"날씨",
+    answers:["Vaqt","Ob-havo","Fasl","Harorat"],
+    correct:"Ob-havo"
 },
 
 {
-word:"행복",
-answers:["Muammo","Baxt","Qo‘rquv","Xavf"],
-correct:1
+    word:"행복",
+    answers:["Sevgi","Baxt","Do‘stlik","Boylik"],
+    correct:"Baxt"
 }
 
 ];
 
-let myScore=0;
-let question=0;
+
+let peer = null;
+let connection = null;
+
+let isHost = false;
+
+let myName = "";
+let opponentName = "";
+
+let myScore = 0;
+let opponentScore = 0;
+
+let currentQuestion = 0;
+let answered = false;
+
+let timer = null;
+let timeLeft = 15;
+
+let roomCode = "";
+
+
+/* =========================
+   RANDOM ROOM CODE
+========================= */
+
+function generateCode(){
+
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+    let result = "";
+
+    for(let i=0;i<6;i++){
+        result += chars[Math.floor(Math.random()*chars.length)];
+    }
+
+    return result;
+}
+
+
+/* =========================
+   CREATE ROOM
+========================= */
 
 function createRoom(){
 
-let name=document.getElementById("name").value;
+    myName = document.getElementById("nameInput").value.trim();
 
-if(!name){
+    if(!myName){
+        alert("Avval ismingizni kiriting!");
+        return;
+    }
 
-alert("Avval ismingizni kiriting!");
+    isHost = true;
 
-return;
+    roomCode = generateCode();
+
+    peer = new Peer(roomCode.toLowerCase());
+
+    peer.on("open", function(id){
+
+        document.getElementById("startScreen").classList.add("hidden");
+
+        document.getElementById("waitingScreen").classList.remove("hidden");
+
+        document.getElementById("roomCode").textContent =
+            roomCode;
+
+    });
+
+
+    peer.on("connection", function(conn){
+
+        connection = conn;
+
+        setupConnection();
+
+    });
+
+
+    peer.on("error", function(error){
+
+        console.log(error);
+
+        if(error.type === "unavailable-id"){
+
+            peer.destroy();
+
+            createRoom();
+
+        }else{
+
+            alert("Ulanishda xatolik: " + error.type);
+
+        }
+
+    });
 
 }
 
-let code=Math.random()
-.toString(36)
-.substring(2,8)
-.toUpperCase();
 
-document.getElementById("start")
-.classList.add("hidden");
-
-document.getElementById("waiting")
-.classList.remove("hidden");
-
-document.getElementById("roomCode")
-.innerText=code;
-
-}
+/* =========================
+   JOIN ROOM
+========================= */
 
 function joinRoom(){
 
-let name=document.getElementById("name").value;
+    myName = document.getElementById("nameInput").value.trim();
 
-let room=document.getElementById("room").value;
+    roomCode = document.getElementById("roomInput").value.trim().toUpperCase();
 
-if(!name){
+    if(!myName){
 
-alert("Ismingizni kiriting!");
+        alert("Avval ismingizni kiriting!");
 
-return;
+        return;
+
+    }
+
+    if(!roomCode){
+
+        alert("Xona kodini kiriting!");
+
+        return;
+
+    }
+
+    isHost = false;
+
+    peer = new Peer();
+
+    peer.on("open", function(){
+
+        connection = peer.connect(
+            roomCode.toLowerCase(),
+            {reliable:true}
+        );
+
+        setupConnection();
+
+    });
+
+
+    peer.on("error", function(error){
+
+        alert("Xonaga ulanib bo‘lmadi. Kodni tekshiring.");
+
+        console.log(error);
+
+    });
 
 }
 
-if(!room){
 
-alert("Xona kodini kiriting!");
+/* =========================
+   CONNECTION
+========================= */
 
-return;
+function setupConnection(){
+
+    connection.on("open", function(){
+
+        connection.send({
+
+            type:"join",
+
+            name:myName
+
+        });
+
+
+        if(isHost){
+
+            document.getElementById("connectionStatus").textContent =
+                "✅ Ikkinchi o‘yinchi qo‘shildi! O‘yin boshlanmoqda...";
+
+        }
+
+    });
+
+
+    connection.on("data", function(data){
+
+        handleData(data);
+
+    });
+
+
+    connection.on("close", function(){
+
+        alert("Ikkinchi o‘yinchi o‘yindan chiqdi.");
+
+    });
 
 }
 
-document.getElementById("start")
-.classList.add("hidden");
 
-document.getElementById("game")
-.classList.remove("hidden");
+/* =========================
+   DATA
+========================= */
 
-startGame();
+function handleData(data){
+
+
+    if(data.type === "join"){
+
+        opponentName = data.name;
+
+        if(isHost){
+
+            startGame();
+
+        }
+
+    }
+
+
+    if(data.type === "start"){
+
+        opponentName = data.hostName;
+
+        startGame();
+
+    }
+
+
+    if(data.type === "score"){
+
+        opponentScore = data.score;
+
+        updateScores();
+
+    }
+
+
+    if(data.type === "next"){
+
+        currentQuestion = data.question;
+
+        showQuestion();
+
+    }
+
+
+    if(data.type === "finish"){
+
+        opponentScore = data.opponentScore;
+
+        showResult(data.hostScore);
+
+    }
 
 }
+
+
+/* =========================
+   START GAME
+========================= */
 
 function startGame(){
 
-document.getElementById("p1")
-.innerText="Siz";
+    document.getElementById("waitingScreen").classList.add("hidden");
 
-showQuestion();
+    document.getElementById("gameScreen").classList.remove("hidden");
+
+    if(isHost){
+
+        opponentName = opponentName || "Player 2";
+
+        connection.send({
+
+            type:"start",
+
+            hostName:myName
+
+        });
+
+    }
+
+    document.getElementById("hostName").textContent =
+        isHost ? myName : opponentName;
+
+    document.getElementById("guestName").textContent =
+        isHost ? opponentName : myName;
+
+    currentQuestion = 0;
+
+    showQuestion();
 
 }
+
+
+/* =========================
+   SHOW QUESTION
+========================= */
 
 function showQuestion(){
 
-if(question>=questions.length){
+    answered = false;
 
-finish();
+    clearInterval(timer);
 
-return;
+    if(currentQuestion >= questions.length){
+
+        finishGame();
+
+        return;
+
+    }
+
+    const q = questions[currentQuestion];
+
+    document.getElementById("questionNumber").textContent =
+        (currentQuestion+1) + " / " + questions.length;
+
+    document.getElementById("word").textContent =
+        q.word;
+
+    const answersBox =
+        document.getElementById("answers");
+
+    answersBox.innerHTML = "";
+
+    q.answers.forEach(answer => {
+
+        const btn = document.createElement("button");
+
+        btn.className = "answer";
+
+        btn.textContent = answer;
+
+        btn.onclick = function(){
+
+            answerQuestion(answer, btn);
+
+        };
+
+        answersBox.appendChild(btn);
+
+    });
+
+
+    timeLeft = 15;
+
+    updateTimer();
+
+    timer = setInterval(function(){
+
+        timeLeft--;
+
+        updateTimer();
+
+        if(timeLeft <= 0){
+
+            clearInterval(timer);
+
+            disableAnswers();
+
+            if(isHost){
+
+                setTimeout(nextQuestion,1000);
+
+            }
+
+        }
+
+    },1000);
 
 }
 
-let q=questions[question];
 
-document.getElementById("number")
-.innerText=question+1;
+/* =========================
+   TIMER
+========================= */
 
-document.getElementById("word")
-.innerText=q.word;
+function updateTimer(){
 
-let box=document.getElementById("answers");
-
-box.innerHTML="";
-
-q.answers.forEach((answer,index)=>{
-
-let button=document.createElement("button");
-
-button.className="answer";
-
-button.innerText=answer;
-
-button.onclick=()=>answerQuestion(index);
-
-box.appendChild(button);
-
-});
+    document.getElementById("timerBar").style.width =
+        (timeLeft / 15 * 100) + "%";
 
 }
 
-function answerQuestion(index){
 
-let q=questions[question];
+/* =========================
+   ANSWER
+========================= */
 
-if(index===q.correct){
+function answerQuestion(answer, button){
 
-myScore++;
+    if(answered) return;
 
-document.getElementById("gameStatus")
-.innerText="✅ To‘g‘ri!";
+    answered = true;
 
-}else{
+    clearInterval(timer);
 
-document.getElementById("gameStatus")
-.innerText="❌ Noto‘g‘ri";
+    const correct =
+        questions[currentQuestion].correct === answer;
+
+
+    if(correct){
+
+        button.classList.add("correct");
+
+        myScore += 10;
+
+    }else{
+
+        button.classList.add("wrong");
+
+        myScore += 0;
+
+    }
+
+    disableAnswers();
+
+    updateScores();
+
+
+    if(!isHost){
+
+        connection.send({
+
+            type:"score",
+
+            score:myScore
+
+        });
+
+    }
 
 }
 
-document.getElementById("s1")
-.innerText=myScore;
 
-setTimeout(()=>{
+/* =========================
+   DISABLE ANSWERS
+========================= */
 
-question++;
+function disableAnswers(){
 
-showQuestion();
+    document.querySelectorAll(".answer").forEach(btn => {
 
-},700);
+        btn.disabled = true;
+
+    });
 
 }
 
-function finish(){
 
-document.getElementById("game")
-.classList.add("hidden");
+/* =========================
+   UPDATE SCORE
+========================= */
 
-document.getElementById("result")
-.classList.remove("hidden");
+function updateScores(){
 
-document.getElementById("winner")
-.innerText=
-"Sizning natijangiz: "+myScore+" / "+questions.length;
+    document.getElementById("hostScore").textContent =
+        isHost ? myScore : opponentScore;
+
+    document.getElementById("guestScore").textContent =
+        isHost ? opponentScore : myScore;
+
+}
+
+
+/* =========================
+   NEXT QUESTION
+========================= */
+
+function nextQuestion(){
+
+    currentQuestion++;
+
+    if(currentQuestion >= questions.length){
+
+        finishGame();
+
+        return;
+
+    }
+
+    connection.send({
+
+        type:"next",
+
+        question:currentQuestion
+
+    });
+
+    showQuestion();
+
+}
+
+
+/* =========================
+   FINISH
+========================= */
+
+function finishGame(){
+
+    clearInterval(timer);
+
+    if(isHost){
+
+        connection.send({
+
+            type:"finish",
+
+            hostScore:myScore,
+
+            opponentScore:opponentScore
+
+        });
+
+    }
+
+    showResult(isHost ? myScore : opponentScore);
+
+}
+
+
+/* =========================
+   RESULT
+========================= */
+
+function showResult(hostFinalScore){
+
+    document.getElementById("gameScreen").classList.add("hidden");
+
+    document.getElementById("resultScreen").classList.remove("hidden");
+
+
+    let player1Score =
+        isHost ? myScore : hostFinalScore;
+
+    let player2Score =
+        isHost ? opponentScore : myScore;
+
+
+    let winnerText = "";
+
+
+    if(player1Score > player2Score){
+
+        winnerText =
+            "🏆 " +
+            document.getElementById("hostName").textContent +
+            " g‘olib!";
+
+    }
+
+    else if(player2Score > player1Score){
+
+        winnerText =
+            "🏆 " +
+            document.getElementById("guestName").textContent +
+            " g‘olib!";
+
+    }
+
+    else{
+
+        winnerText = "🤝 Durrang!";
+
+    }
+
+
+    document.getElementById("winner").textContent =
+        winnerText;
+
+
+    document.getElementById("finalScore").innerHTML =
+        "<h3>" +
+        player1Score +
+        " : " +
+        player2Score +
+        "</h3>";
 
 }
 
