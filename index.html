@@ -6,7 +6,7 @@
 <title>F-TOPIK WORD BATTLE</title>
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-
+<script src="questions.js"></script>
 <style>
 *{
     box-sizing:border-box;
@@ -332,59 +332,11 @@ button:hover{
 
 <script>
 
-const questions = [
-    {
-        word:"심리학자",
-        answers:["psixolog","talab","qurilish","instinkt"],
-        correct:"psixolog"
-    },
-    {
-        word:"도전",
-        answers:["da’vat, undov","quruq","irsiy","qalin"],
-        correct:"da’vat, undov"
-    },
-    {
-        word:"요구",
-        answers:["talab","psixolog","qurilish","instinkt"],
-        correct:"talab"
-    },
-    {
-        word:"건조하다",
-        answers:["quruq","irsiy","qalin","instinkt"],
-        correct:"quruq"
-    },
-    {
-        word:"유전적",
-        answers:["irsiy, genetik","qurilish","psixolog","talab"],
-        correct:"irsiy, genetik"
-    },
-    {
-        word:"공사",
-        answers:["qurilish","qalin","quruq","instinkt"],
-        correct:"qurilish"
-    },
-    {
-        word:"굵다",
-        answers:["qalin","psixolog","talab","quruq"],
-        correct:"qalin"
-    },
-    {
-        word:"본능",
-        answers:["instinkt","qurilish","irsiy","psixolog"],
-        correct:"instinkt"
-    },
-    {
-        word:"밀려오다",
-        answers:["uyulib kelmoq","kamyob","himoya qilmoq","juda ta’sirlanmoq"],
-        correct:"uyulib kelmoq"
-    },
-    {
-        word:"드물다",
-        answers:["kamyob","uyulib kelmoq","qurilish","qalin"],
-        correct:"kamyob"
-    }
-
-];
+const questions = wordBank.map(item => ({
+    word: item.korean,
+    answers: [item.uzbek],
+    correct: item.uzbek
+}));
 
 
 let peer = null;
