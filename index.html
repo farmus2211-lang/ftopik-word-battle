@@ -332,11 +332,26 @@ button:hover{
 
 <script>
 
-const questions = wordBank.map(item => ({
-    word: item.korean,
-    answers: [item.uzbek],
-    correct: item.uzbek
-}));
+const questions = wordBank.map(item => {
+
+    const wrongAnswers = wordBank
+        .filter(x => x.uzbek !== item.uzbek)
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 3)
+        .map(x => x.uzbek);
+
+    const answers = [
+        item.uzbek,
+        ...wrongAnswers
+    ].sort(() => Math.random() - 0.5);
+
+    return {
+        word: item.korean,
+        answers: answers,
+        correct: item.uzbek
+    };
+
+});
 
 
 let peer = null;
