@@ -241,6 +241,78 @@ button:hover{
     margin:15px 0;
 }
 
+/* =========================
+   WINNER + STATS
+========================= */
+.trophy{
+    animation:trophyBounce 1s ease-in-out infinite alternate;
+    text-shadow:0 8px 25px rgba(103,61,230,.18);
+}
+.winner{
+    animation:winnerPop .7s ease both;
+}
+.winner-subtitle{
+    margin:6px 0 18px;
+    color:#777;
+}
+.stats-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin-top:18px;
+}
+.stats-card{
+    background:#faf9ff;
+    border:1px solid #ece7fb;
+    border-radius:16px;
+    padding:14px 10px;
+}
+.stats-card-title{
+    font-weight:900;
+    margin-bottom:10px;
+    font-size:16px;
+}
+.stats-row{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    padding:7px 0;
+    border-bottom:1px solid #eee;
+    font-size:14px;
+}
+.stats-row:last-child{
+    border-bottom:none;
+}
+.stats-value{
+    font-weight:900;
+    color:#673de6;
+}
+.confetti-piece{
+    position:fixed;
+    top:-30px;
+    z-index:9999;
+    pointer-events:none;
+    font-size:22px;
+    animation:confettiFall 2.7s ease-in forwards;
+}
+@keyframes trophyBounce{
+    from{transform:translateY(0) rotate(-3deg)}
+    to{transform:translateY(-10px) rotate(3deg)}
+}
+@keyframes winnerPop{
+    0%{transform:scale(.7);opacity:0}
+    70%{transform:scale(1.08);opacity:1}
+    100%{transform:scale(1);opacity:1}
+}
+@keyframes confettiFall{
+    0%{transform:translateY(-10vh) rotate(0deg);opacity:1}
+    100%{transform:translateY(110vh) rotate(720deg);opacity:0}
+}
+@media(max-width:500px){
+    .stats-grid{grid-template-columns:1fr}
+}
+
+
 .small{
     font-size:14px;
     color:#888;
@@ -373,13 +445,16 @@ button:hover{
 <!-- RESULT -->
 <div id="resultScreen" class="card hidden result">
 
-    <div class="trophy">🏆</div>
+    <div class="trophy" id="resultTrophy">🏆</div>
 
     <h2>O‘yin tugadi!</h2>
 
     <div id="winner" class="winner"></div>
+    <div id="winnerSubtitle" class="winner-subtitle"></div>
 
     <div id="finalScore"></div>
+
+    <div id="statsGrid" class="stats-grid"></div>
 
     <button onclick="location.reload()">
         🔄 Yana o‘ynash
@@ -439,6 +514,18 @@ let myCombo = 0;
 let opponentCombo = 0;
 let myMaxCombo = 0;
 let opponentMaxCombo = 0;
+
+let myCorrect = 0;
+let myWrong = 0;
+let myFastBonus = 0;
+let myAnswerTime = 0;
+let myAnswers = 0;
+
+let opponentCorrect = 0;
+let opponentWrong = 0;
+let opponentFastBonus = 0;
+let opponentAnswerTime = 0;
+let opponentAnswers = 0;
 
 let currentQuestion = 0;
 let answered = false;
@@ -667,6 +754,7 @@ function handleData(data){
         opponentScore = Number(data.score) || 0;
         opponentCombo = typeof data.combo === "number" ? data.combo : opponentCombo;
         opponentMaxCombo = typeof data.maxCombo === "number" ? data.maxCombo : opponentMaxCombo;
+        setOpponentStats(data.stats);
         guestAnswered = true;
         updateScores();
         showOpponentFeedback(data);
@@ -689,6 +777,7 @@ function handleData(data){
             opponentCombo = 0;
             opponentScore = typeof data.score === "number" ? data.score : opponentScore;
             opponentMaxCombo = typeof data.maxCombo === "number" ? data.maxCombo : opponentMaxCombo;
+            setOpponentStats(data.stats);
             guestAnswered = true;
             updateScores();
             showFeedback("⏰ Raqib vaqtida javob bermadi");
@@ -702,12 +791,85 @@ function handleData(data){
 
         opponentScore = data.opponentScore;
         opponentMaxCombo = typeof data.guestMaxCombo === "number" ? data.guestMaxCombo : opponentMaxCombo;
-        showResult(data.hostScore);
+        setOpponentStats(isHost ? data.guestStats : data.hostStats);
+        showResult(data.hostScore, data.hostStats, data.guestStats);
 
     }
 
 }
 
+
+function getMyStats(){
+    return {
+        correct: myCorrect,
+        wrong: myWrong,
+        fastBonus: myFastBonus,
+        maxCombo: myMaxCombo,
+        answers: myAnswers,
+        answerTime: myAnswerTime
+    };
+}
+
+function resetStats(){
+    myCorrect = 0;
+    myWrong = 0;
+    myFastBonus = 0;
+    myAnswerTime = 0;
+    myAnswers = 0;
+
+    opponentCorrect = 0;
+    opponentWrong = 0;
+    opponentFastBonus = 0;
+    opponentAnswerTime = 0;
+    opponentAnswers = 0;
+}
+
+function setOpponentStats(stats){
+    stats = stats || {};
+    opponentCorrect = Number(stats.correct) || 0;
+    opponentWrong = Number(stats.wrong) || 0;
+    opponentFastBonus = Number(stats.fastBonus) || 0;
+    opponentAnswerTime = Number(stats.answerTime) || 0;
+    opponentAnswers = Number(stats.answers) || 0;
+    opponentMaxCombo = Number(stats.maxCombo) || opponentMaxCombo;
+}
+
+function accuracyFor(stats){
+    if(!stats || !stats.answers) return 0;
+    return Math.round((stats.correct / stats.answers) * 100);
+}
+
+function averageTimeFor(stats){
+    if(!stats || !stats.answers) return 0;
+    return (stats.answerTime / stats.answers).toFixed(1);
+}
+
+function buildStatsHtml(name, score, stats){
+    const s = stats || {};
+    return '<div class="stats-card">' +
+        '<div class="stats-card-title">' + escapeHtml(name) + ' • ' + score + ' ball</div>' +
+        '<div class="stats-row"><span>✅ To‘g‘ri</span><span class="stats-value">' + (Number(s.correct)||0) + '</span></div>' +
+        '<div class="stats-row"><span>❌ Xato/vaqt</span><span class="stats-value">' + (Number(s.wrong)||0) + '</span></div>' +
+        '<div class="stats-row"><span>🎯 Aniqlik</span><span class="stats-value">' + accuracyFor(s) + '%</span></div>' +
+        '<div class="stats-row"><span>🔥 Max combo</span><span class="stats-value">x' + (Number(s.maxCombo)||0) + '</span></div>' +
+        '<div class="stats-row"><span>⚡ Tezlik bonusi</span><span class="stats-value">+' + (Number(s.fastBonus)||0) + '</span></div>' +
+        '<div class="stats-row"><span>⏱️ O‘rtacha vaqt</span><span class="stats-value">' + averageTimeFor(s) + ' s</span></div>' +
+        '</div>';
+}
+
+function launchConfetti(){
+    const symbols = ['🎉','✨','🎊','💜','⭐'];
+    for(let i=0;i<28;i++){
+        const piece = document.createElement('div');
+        piece.className = 'confetti-piece';
+        piece.textContent = symbols[Math.floor(Math.random()*symbols.length)];
+        piece.style.left = (Math.random()*100) + 'vw';
+        piece.style.animationDelay = (Math.random()*0.8) + 's';
+        piece.style.transform = 'rotate(' + (Math.random()*180) + 'deg)';
+        document.body.appendChild(piece);
+        setTimeout(function(){ piece.remove(); }, 3600);
+    }
+}
 
 /* =========================
    START GAME
@@ -759,6 +921,7 @@ function startGame(){
     opponentCombo = 0;
     myMaxCombo = 0;
     opponentMaxCombo = 0;
+    resetStats();
     updateScores();
 
     showQuestion();
@@ -854,6 +1017,8 @@ function showQuestion(){
             if(!answered){
                 answered = true;
                 myCombo = 0;
+                myWrong++;
+                myAnswers++;
                 updateScores();
                 showFeedback("⏰ Vaqt tugadi!");
 
@@ -862,13 +1027,14 @@ function showQuestion(){
                     if(connection){
                         connection.send({
                             type:"score", score:myScore, combo:myCombo,
-                            maxCombo:myMaxCombo, correct:false, fastBonus:0, question:currentQuestion
+                            maxCombo:myMaxCombo, correct:false, fastBonus:0,
+                            question:currentQuestion, stats:getMyStats()
                         });
                     }
                 }else if(connection){
                     connection.send({
                         type:"timeout", score:myScore, combo:myCombo,
-                        maxCombo:myMaxCombo, question:currentQuestion
+                        maxCombo:myMaxCombo, question:currentQuestion, stats:getMyStats()
                     });
                 }
             }
@@ -907,9 +1073,7 @@ function answerQuestion(answer, button){
 
     answered = true;
 
-    if(!isHost){
-        clearInterval(timer);
-    }
+    clearInterval(timer);
 
     const correct = questions[currentQuestion].correct === answer;
     const secondsLeftAtAnswer = timeLeft;
@@ -917,17 +1081,22 @@ function answerQuestion(answer, button){
     let comboBonus = 0;
     let totalPoints = 0;
 
+    myAnswers++;
+    myAnswerTime += Math.max(0, 15 - secondsLeftAtAnswer);
+
     if(correct){
+        myCorrect++;
         button.classList.add("correct");
         myCombo++;
         myMaxCombo = Math.max(myMaxCombo, myCombo);
         fastBonus = getFastBonus(secondsLeftAtAnswer);
+        myFastBonus += fastBonus;
         comboBonus = Math.min((myCombo - 1) * 2, 10);
         totalPoints = 10 + fastBonus + comboBonus;
         myScore += totalPoints;
         showFeedback("✅ To‘g‘ri! +" + totalPoints + " ball" + (fastBonus ? " ⚡+" + fastBonus : "") + (comboBonus ? " 🔥+" + comboBonus : ""));
     }else{
-        button.classList.add("wrong");
+        myWrong++;
         myCombo = 0;
         document.querySelectorAll(".answer").forEach(function(btn){
             if(btn.textContent === questions[currentQuestion].correct){
@@ -947,7 +1116,8 @@ function answerQuestion(answer, button){
         maxCombo:myMaxCombo,
         correct:correct,
         fastBonus:fastBonus,
-        question:currentQuestion
+        question:currentQuestion,
+        stats:getMyStats()
     };
 
     if(!isHost && connection) connection.send(payload);
@@ -1111,12 +1281,23 @@ function finishGame(){
             hostScore:myScore,
             opponentScore:opponentScore,
             hostMaxCombo:myMaxCombo,
-            guestMaxCombo:opponentMaxCombo
+            guestMaxCombo:opponentMaxCombo,
+            hostStats:getMyStats(),
+            guestStats:{
+                correct:opponentCorrect,
+                wrong:opponentWrong,
+                fastBonus:opponentFastBonus,
+                maxCombo:opponentMaxCombo,
+                answers:opponentAnswers,
+                answerTime:opponentAnswerTime
+            }
         });
 
     }
 
-    showResult(isHost ? myScore : opponentScore);
+    showResult(isHost ? myScore : opponentScore,
+               isHost ? getMyStats() : null,
+               isHost ? null : getMyStats());
 
 }
 
@@ -1125,58 +1306,56 @@ function finishGame(){
    RESULT
 ========================= */
 
-function showResult(hostFinalScore){
+function showResult(hostFinalScore, hostStats, guestStats){
 
     document.getElementById("gameScreen").classList.add("hidden");
-
     document.getElementById("resultScreen").classList.remove("hidden");
 
+    let player1Score = isHost ? myScore : hostFinalScore;
+    let player2Score = isHost ? opponentScore : myScore;
 
-    let player1Score =
-        isHost ? myScore : hostFinalScore;
-
-    let player2Score =
-        isHost ? opponentScore : myScore;
-
+    // If this is the guest, use the host/guest stats received from the finish message.
+    let player1Stats = isHost ? getMyStats() : (hostStats || {});
+    let player2Stats = isHost ? (guestStats || {
+        correct:opponentCorrect,
+        wrong:opponentWrong,
+        fastBonus:opponentFastBonus,
+        maxCombo:opponentMaxCombo,
+        answers:opponentAnswers,
+        answerTime:opponentAnswerTime
+    }) : getMyStats();
 
     let winnerText = "";
-
+    let subtitle = "";
+    let hasWinner = false;
 
     if(player1Score > player2Score){
-
-        winnerText =
-            "🏆 " +
-            document.getElementById("hostName").textContent +
-            " g‘olib!";
-
-    }
-
-    else if(player2Score > player1Score){
-
-        winnerText =
-            "🏆 " +
-            document.getElementById("guestName").textContent +
-            " g‘olib!";
-
-    }
-
-    else{
-
+        winnerText = "🏆 " + document.getElementById("hostName").textContent + " g‘olib!";
+        subtitle = "Ajoyib natija! 🎉";
+        hasWinner = true;
+    }else if(player2Score > player1Score){
+        winnerText = "🏆 " + document.getElementById("guestName").textContent + " g‘olib!";
+        subtitle = "Ajoyib natija! 🎉";
+        hasWinner = true;
+    }else{
         winnerText = "🤝 Durrang!";
-
+        subtitle = "Ikkala o‘yinchi ham teng ball oldi.";
     }
 
-
-    document.getElementById("winner").textContent =
-        winnerText;
-
-
+    document.getElementById("winner").textContent = winnerText;
+    document.getElementById("winnerSubtitle").textContent = subtitle;
     document.getElementById("finalScore").innerHTML =
-        "<h3>" +
-        player1Score +
-        " : " +
-        player2Score +
-        "</h3>";
+        "<h3>" + player1Score + " : " + player2Score + "</h3>";
+
+    document.getElementById("statsGrid").innerHTML =
+        buildStatsHtml(document.getElementById("hostName").textContent || "Player 1", player1Score, player1Stats) +
+        buildStatsHtml(document.getElementById("guestName").textContent || "Player 2", player2Score, player2Stats);
+
+    document.getElementById("resultTrophy").textContent = hasWinner ? "🏆" : "🤝";
+
+    if(hasWinner){
+        launchConfetti();
+    }
 
 }
 
