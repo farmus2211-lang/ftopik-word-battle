@@ -6,7 +6,7 @@
 <title>F-TOPIK WORD BATTLE</title>
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="questions.js"></script>
+<script src="questions.js?v=20261005"></script>
 <style>
 *{
     box-sizing:border-box;
@@ -182,37 +182,6 @@ button:hover{
     border-color:#e74c3c;
 }
 
-
-.leaderboard{
-    margin:0 0 20px;
-    background:linear-gradient(135deg,#f7f3ff,#eef4ff);
-    border:2px solid #e8defc;
-    border-radius:18px;
-    padding:15px;
-}
-.leaderboard-title{
-    text-align:center;
-    font-size:18px;
-    font-weight:900;
-    color:#673de6;
-    margin-bottom:10px;
-}
-.leaderboard-row{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
-    background:white;
-    border-radius:12px;
-    padding:10px 12px;
-    margin-top:7px;
-    box-shadow:0 3px 10px rgba(80,40,150,.06);
-}
-.leaderboard-row.first{border:2px solid #ffd54a;}
-.leaderboard-rank{font-size:20px;font-weight:900;min-width:32px;}
-.leaderboard-name{flex:1;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.leaderboard-score{font-weight:900;color:#673de6;}
-
 .hidden{
     display:none;
 }
@@ -322,11 +291,6 @@ button:hover{
             <div id="guestScore" class="score">0</div>
         </div>
 
-    </div>
-
-    <div class="leaderboard">
-        <div class="leaderboard-title">🏆 Leaderboard</div>
-        <div id="leaderboardList"></div>
     </div>
 
     <div id="questionNumber" class="question-number">
@@ -643,6 +607,18 @@ function handleData(data){
     }
 
 
+    if(data.type === "timeout"){
+
+        // Faqat Host timeoutni qabul qiladi.
+        if(isHost && data.question === currentQuestion && !hostAnswered){
+
+            nextQuestion();
+
+        }
+
+    }
+
+
     if(data.type === "finish"){
 
         opponentScore = data.opponentScore;
@@ -668,6 +644,14 @@ function startGame(){
 
         opponentName = opponentName || "Player 2";
 
+        if(!Array.isArray(questions) || questions.length === 0){
+
+            alert("Savollar yuklanmadi. Sahifani Ctrl + F5 bilan yangilang.");
+
+            return;
+
+        }
+
         connection.send({
 
             type:"start",
@@ -688,7 +672,6 @@ function startGame(){
 
     currentQuestion = 0;
 
-    updateScores();
     showQuestion();
 
 }
@@ -713,6 +696,11 @@ function showQuestion(){
 
     const q = questions[currentQuestion];
 
+    if(!q){
+        console.error("Savol topilmadi:", currentQuestion);
+        return;
+    }
+
     document.getElementById("questionNumber").textContent =
         (currentQuestion + 1) + " / " + questions.length;
 
@@ -721,9 +709,9 @@ function showQuestion(){
     const answersBox = document.getElementById("answers");
     answersBox.innerHTML = "";
 
-    // Agar savolda variantlar bo‘lmasa, avtomatik yaratadi
     let answerList = Array.isArray(q.answers) ? [...q.answers] : [];
 
+    // Agar 4 ta variant bo‘lmasa, questions.js dagi wordBankdan yaratadi
     if(answerList.length < 4 && typeof wordBank !== "undefined"){
 
         const wrongAnswers = wordBank
@@ -735,8 +723,14 @@ function showQuestion(){
         answerList = [q.correct, ...wrongAnswers];
     }
 
-    answerList = [...new Set(answerList)]
-        .sort(() => Math.random() - 0.5);
+    answerList = [...new Set(answerList)];
+
+    // 4 ta variant bo‘lishini ta’minlash
+    if(answerList.length > 4){
+        answerList = answerList.slice(0, 4);
+    }
+
+    answerList.sort(() => Math.random() - 0.5);
 
     answerList.forEach(answer => {
 
@@ -766,8 +760,22 @@ function showQuestion(){
             clearInterval(timer);
             disableAnswers();
 
+            // Host keyingi savolni o‘zi boshqaradi.
             if(isHost){
+
                 nextQuestion();
+
+            }else{
+
+                // Guest Hostga timeout bo‘lganini bildiradi.
+                if(connection){
+
+                    connection.send({
+                        type:"timeout",
+                        question:currentQuestion
+                    });
+
+                }
             }
         }
 
@@ -879,7 +887,6 @@ function updateScores(){
     document.getElementById("guestScore").textContent =
         isHost ? opponentScore : myScore;
 
-    updateLeaderboard();
 }
 
 
@@ -887,45 +894,9 @@ function updateScores(){
    NEXT QUESTION
 ========================= */
 
-
-function updateLeaderboard(){
-
-    const list = document.getElementById("leaderboardList");
-    if(!list) return;
-
-    const players = [
-        {
-            name: isHost ? myName : opponentName,
-            score: isHost ? myScore : opponentScore
-        },
-        {
-            name: isHost ? opponentName : myName,
-            score: isHost ? opponentScore : myScore
-        }
-    ];
-
-    players.sort((a,b) => b.score - a.score);
-
-    list.innerHTML = "";
-
-    players.forEach((player,index) => {
-
-        const row = document.createElement("div");
-        row.className = "leaderboard-row" + (index === 0 ? " first" : "");
-
-        const medals = ["🥇","🥈","🥉"];
-        const rank = medals[index] || ((index + 1) + ".");
-
-        row.innerHTML =
-            '<div class="leaderboard-rank">' + rank + '</div>' +
-            '<div class="leaderboard-name">' + (player.name || "Player") + '</div>' +
-            '<div class="leaderboard-score">' + player.score + ' ball</div>';
-
-        list.appendChild(row);
-    });
-}
-
 function nextQuestion(){
+
+    clearInterval(timer);
 
     currentQuestion++;
 
@@ -937,13 +908,17 @@ function nextQuestion(){
 
     }
 
-    connection.send({
+    if(isHost && connection){
 
-        type:"next",
+        connection.send({
 
-        question:currentQuestion
+            type:"next",
 
-    });
+            question:currentQuestion
+
+        });
+
+    }
 
     showQuestion();
 
