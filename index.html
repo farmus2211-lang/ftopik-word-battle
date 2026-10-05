@@ -6,1360 +6,1098 @@
 <title>F-TOPIK WORD BATTLE</title>
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-database-compat.js"></script>
+<script src="firebase-config.js?v=20261006"></script>
 <script src="questions.js?v=20261006"></script>
+
 <style>
-*{
-    box-sizing:border-box;
-}
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(135deg,#eef0ff,#f7f2ff);color:#222}
+.container{max-width:720px;margin:auto;padding:18px}
+.logo{text-align:center;font-size:30px;font-weight:900;color:#6c35d9;margin:20px 0 5px}
+.subtitle{text-align:center;color:#777;margin-bottom:22px}
+.card{background:white;border-radius:25px;padding:24px;box-shadow:0 10px 35px rgba(80,40,150,.12)}
+input,select{width:100%;padding:15px;border:2px solid #ddd;border-radius:12px;font-size:16px;margin-bottom:12px;outline:none;background:#fff}
+input:focus,select:focus{border-color:#7546e8}
+label{display:block;font-size:14px;font-weight:800;color:#666;margin:2px 0 7px}
+button{width:100%;padding:15px;border:none;border-radius:12px;background:linear-gradient(135deg,#673de6,#9b45d9);color:white;font-size:17px;font-weight:bold;cursor:pointer;margin-top:8px}
+button:hover{opacity:.92}
+button:disabled{opacity:.55;cursor:not-allowed}
+.secondary{background:#eee;color:#333}
+.small{font-size:14px;color:#888;text-align:center;margin-top:13px}
+.hidden{display:none!important}
+.section-title{margin:0 0 14px;font-size:20px}
+.divider{margin:24px 0;border:none;border-top:1px solid #eee}
 
-body{
-    margin:0;
-    font-family:Arial, sans-serif;
-    background:linear-gradient(135deg,#eef0ff,#f7f2ff);
-    color:#222;
-}
+/* Public lobby */
+.public-lobby{margin-top:18px;padding-top:18px;border-top:1px solid #eee}
+.public-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.public-head h3{margin:0;font-size:18px}
+.refresh-btn{width:auto;padding:9px 13px;font-size:13px;margin:0}
+.rooms-list{display:grid;gap:9px}
+.room-row{display:flex;align-items:center;gap:10px;background:#faf9ff;border:1px solid #ece7fb;border-radius:14px;padding:12px}
+.room-main{flex:1;min-width:0}
+.room-title{font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.room-meta{font-size:12px;color:#777;margin-top:4px}
+.join-public{width:auto;margin:0;padding:10px 14px;font-size:14px}
+.empty-rooms{font-size:14px;color:#888;text-align:center;padding:14px 5px;background:#fafafa;border-radius:12px}
 
-.container{
-    max-width:650px;
-    margin:auto;
-    padding:20px;
-}
+/* Waiting */
+.room{text-align:center;font-size:38px;font-weight:900;letter-spacing:8px;color:#673de6;padding:12px}
+.status{text-align:center;padding:14px;margin:14px 0;border-radius:12px;background:#f3efff;color:#6334c9;font-weight:700}
+.waiting-list{display:grid;gap:8px;margin:15px 0}
+.waiting-player{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-radius:11px;background:#f8f6ff;border:1px solid #ece7fb}
+.waiting-player .name{font-weight:800}
+.waiting-player .tag{font-size:12px;color:#777}
 
-.logo{
-    text-align:center;
-    font-size:30px;
-    font-weight:900;
-    color:#6c35d9;
-    margin:20px 0 5px;
-}
+/* Game */
+.top-line{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+.question-number{font-weight:800;color:#777}
+.my-badge{padding:7px 10px;background:#f0eaff;border-radius:999px;color:#673de6;font-weight:900;font-size:13px}
+.timer-text{text-align:center;font-weight:900;color:#673de6;margin:0 0 8px}
+.timer{height:12px;background:#eee;border-radius:20px;overflow:hidden;margin-bottom:18px}
+.timer-bar{height:100%;width:100%;background:linear-gradient(90deg,#7c42ed,#bd42cf);transition:width 1s linear}
+.word{text-align:center;font-size:46px;font-weight:900;margin:22px 0}
+.answers{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.answer{background:white;color:#333;border:2px solid #e2dcef;min-height:65px;margin:0}
+.answer:hover{background:#f5f0ff}
+.answer.correct{background:#27ae60;color:white;border-color:#27ae60}
+.answer.wrong{background:#e74c3c;color:white;border-color:#e74c3c}
+.feedback{text-align:center;min-height:28px;font-weight:900;margin:7px 0}
 
-.subtitle{
-    text-align:center;
-    color:#777;
-    margin-bottom:25px;
-}
+.players-board{margin-top:18px;display:grid;gap:7px}
+.board-title{font-size:15px;font-weight:900;margin-bottom:2px}
+.board-row{display:grid;grid-template-columns:34px 1fr auto auto;gap:8px;align-items:center;padding:9px 11px;border-radius:12px;background:#faf9ff;border:1px solid #ece7fb}
+.board-row.me{background:#f0eaff;border-color:#d8c9ff}
+.board-rank{font-weight:900}
+.board-name{font-weight:800;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.board-combo{font-size:12px;color:#6f55a7;font-weight:800}
+.board-score{font-weight:900;color:#673de6}
 
-.card{
-    background:white;
-    border-radius:25px;
-    padding:25px;
-    box-shadow:0 10px 35px rgba(80,40,150,.12);
-}
+/* Result */
+.result{text-align:center}
+.trophy{font-size:72px;animation:trophyBounce 1s ease-in-out infinite alternate;text-shadow:0 8px 25px rgba(103,61,230,.18)}
+.winner{font-size:28px;font-weight:900;color:#673de6;margin:12px 0;animation:winnerPop .7s ease both}
+.winner-subtitle{margin:6px 0 16px;color:#777}
+.final-score{font-size:24px;font-weight:900;margin:8px 0 14px}
+.final-table{display:grid;gap:8px;margin-top:15px;text-align:left}
+.final-player{background:#faf9ff;border:1px solid #ece7fb;border-radius:14px;padding:13px}
+.final-player.first{background:#fff9e8}
+.final-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.final-name{font-weight:900}
+.final-score-small{font-weight:900;color:#673de6}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.stats-card{background:#fff;border:1px solid #ece7fb;border-radius:13px;padding:11px}
+.stats-card-title{font-weight:900;margin-bottom:7px;font-size:14px}
+.stats-row{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid #eee;font-size:13px}
+.stats-row:last-child{border-bottom:none}
+.stats-value{font-weight:900;color:#673de6}
+.confetti-piece{position:fixed;top:-30px;z-index:9999;pointer-events:none;font-size:22px;animation:confettiFall 2.7s ease-in forwards}
+@keyframes trophyBounce{from{transform:translateY(0) rotate(-3deg)}to{transform:translateY(-10px) rotate(3deg)}}
+@keyframes winnerPop{0%{transform:scale(.7);opacity:0}70%{transform:scale(1.08);opacity:1}100%{transform:scale(1);opacity:1}}
+@keyframes confettiFall{0%{transform:translateY(-10vh) rotate(0deg);opacity:1}100%{transform:translateY(110vh) rotate(720deg);opacity:0}}
 
-input{
-    width:100%;
-    padding:15px;
-    border:2px solid #ddd;
-    border-radius:12px;
-    font-size:16px;
-    margin-bottom:12px;
-    outline:none;
-}
-
-input:focus{
-    border-color:#7546e8;
-}
-
-.mode-label{
-    display:block;
-    font-size:14px;
-    font-weight:800;
-    color:#666;
-    margin:2px 0 7px;
-}
-
-.mode-select{
-    width:100%;
-    padding:15px;
-    border:2px solid #ddd;
-    border-radius:12px;
-    font-size:16px;
-    margin-bottom:12px;
-    outline:none;
-    background:white;
-}
-
-.mode-select:focus{
-    border-color:#7546e8;
-}
-
-button{
-    width:100%;
-    padding:15px;
-    border:none;
-    border-radius:12px;
-    background:linear-gradient(135deg,#673de6,#9b45d9);
-    color:white;
-    font-size:17px;
-    font-weight:bold;
-    cursor:pointer;
-    margin-top:8px;
-}
-
-button:hover{
-    opacity:.92;
-}
-
-.secondary{
-    background:#eee;
-    color:#333;
-}
-
-.room{
-    text-align:center;
-    font-size:38px;
-    font-weight:900;
-    letter-spacing:8px;
-    color:#673de6;
-    padding:15px;
-}
-
-.status{
-    text-align:center;
-    padding:15px;
-    margin:15px 0;
-    border-radius:12px;
-    background:#f3efff;
-    color:#6334c9;
-}
-
-.players{
-    display:flex;
-    gap:12px;
-    margin-bottom:20px;
-}
-
-.player{
-    flex:1;
-    background:#f6f3ff;
-    border-radius:15px;
-    padding:15px;
-    text-align:center;
-}
-
-.player-name{
-    font-size:15px;
-    color:#666;
-}
-
-.score{
-    font-size:30px;
-    font-weight:900;
-    color:#6b36db;
-}
-
-.question-number{
-    text-align:center;
-    color:#777;
-    margin-bottom:10px;
-}
-
-.timer{
-    height:12px;
-    background:#eee;
-    border-radius:20px;
-    overflow:hidden;
-    margin-bottom:25px;
-}
-
-.timer-bar{
-    height:100%;
-    width:100%;
-    background:linear-gradient(90deg,#7c42ed,#bd42cf);
-    transition:width 1s linear;
-}
-
-.word{
-    text-align:center;
-    font-size:46px;
-    font-weight:900;
-    margin:25px 0;
-}
-
-.answers{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:12px;
-}
-
-.answer{
-    background:white;
-    color:#333;
-    border:2px solid #e2dcef;
-    min-height:65px;
-}
-
-.answer:hover{
-    background:#f5f0ff;
-}
-
-.answer.correct{
-    background:#27ae60;
-    color:white;
-    border-color:#27ae60;
-}
-
-.answer.wrong{
-    background:#e74c3c;
-    color:white;
-    border-color:#e74c3c;
-}
-
-
-.power-hud{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
-.power-item{background:#f8f5ff;border:1px solid #ece5ff;border-radius:14px;padding:10px 12px;text-align:center}
-.power-label{font-size:12px;color:#777;margin-bottom:4px}
-.power-value{font-size:18px;font-weight:900;color:#673de6}
-.combo-badge{display:inline-block;min-width:48px;padding:3px 8px;border-radius:999px;background:#efe8ff}
-.timer-text{text-align:center;font-weight:900;color:#673de6;margin:-16px 0 10px}
-.feedback{text-align:center;min-height:28px;font-weight:900;margin:8px 0 0}
-.leaderboard{margin-top:18px;background:#faf9ff;border:1px solid #ece7fb;border-radius:16px;padding:12px}
-.leaderboard-title{text-align:center;font-weight:900;margin-bottom:8px}
-.leaderboard-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;border-radius:10px;margin:5px 0;background:white}
-.leaderboard-row.first{background:#fff9e8}
-.leaderboard-rank{width:34px;font-weight:900}
-.leaderboard-name{flex:1;text-align:left;font-weight:700}
-.leaderboard-score{font-weight:900;color:#673de6}
-@media(max-width:500px){.power-hud{gap:8px}.power-item{padding:9px 8px}.power-value{font-size:16px}}
-
-.hidden{
-    display:none;
-}
-
-.result{
-    text-align:center;
-}
-
-.trophy{
-    font-size:70px;
-}
-
-.winner{
-    font-size:28px;
-    font-weight:900;
-    color:#673de6;
-    margin:15px 0;
-}
-
-/* =========================
-   WINNER + STATS
-========================= */
-.trophy{
-    animation:trophyBounce 1s ease-in-out infinite alternate;
-    text-shadow:0 8px 25px rgba(103,61,230,.18);
-}
-.winner{
-    animation:winnerPop .7s ease both;
-}
-.winner-subtitle{
-    margin:6px 0 18px;
-    color:#777;
-}
-.stats-grid{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:10px;
-    margin-top:18px;
-}
-.stats-card{
-    background:#faf9ff;
-    border:1px solid #ece7fb;
-    border-radius:16px;
-    padding:14px 10px;
-}
-.stats-card-title{
-    font-weight:900;
-    margin-bottom:10px;
-    font-size:16px;
-}
-.stats-row{
-    display:flex;
-    justify-content:space-between;
-    gap:12px;
-    padding:7px 0;
-    border-bottom:1px solid #eee;
-    font-size:14px;
-}
-.stats-row:last-child{
-    border-bottom:none;
-}
-.stats-value{
-    font-weight:900;
-    color:#673de6;
-}
-.confetti-piece{
-    position:fixed;
-    top:-30px;
-    z-index:9999;
-    pointer-events:none;
-    font-size:22px;
-    animation:confettiFall 2.7s ease-in forwards;
-}
-@keyframes trophyBounce{
-    from{transform:translateY(0) rotate(-3deg)}
-    to{transform:translateY(-10px) rotate(3deg)}
-}
-@keyframes winnerPop{
-    0%{transform:scale(.7);opacity:0}
-    70%{transform:scale(1.08);opacity:1}
-    100%{transform:scale(1);opacity:1}
-}
-@keyframes confettiFall{
-    0%{transform:translateY(-10vh) rotate(0deg);opacity:1}
-    100%{transform:translateY(110vh) rotate(720deg);opacity:0}
-}
-@media(max-width:500px){
-    .stats-grid{grid-template-columns:1fr}
-}
-
-
-.small{
-    font-size:14px;
-    color:#888;
-    text-align:center;
-    margin-top:15px;
-}
-
-@media(max-width:500px){
-    .word{
-        font-size:38px;
-    }
-
-    .answers{
-        grid-template-columns:1fr;
-    }
-
-    .logo{
-        font-size:25px;
-    }
+@media(max-width:520px){
+  .container{padding:12px}
+  .card{padding:18px;border-radius:20px}
+  .logo{font-size:25px}
+  .room{font-size:31px;letter-spacing:5px}
+  .word{font-size:38px;margin:20px 0}
+  .answers{grid-template-columns:1fr}
+  .stats-grid{grid-template-columns:1fr}
+  .board-row{grid-template-columns:30px 1fr auto auto}
 }
 </style>
 </head>
-
 <body>
-
 <div class="container">
 
 <div class="logo">🇰🇷 F-TOPIK WORD BATTLE</div>
-<div class="subtitle">1 vs 1 Korean Vocabulary Game • 10 / 20 / 30 savol</div>
-
+<div class="subtitle">1–10 o‘yinchi • 10 / 20 / 30 savol • real-time</div>
 
 <!-- START -->
 <div id="startScreen" class="card">
+  <h2 class="section-title">🎮 O‘yinni boshlash</h2>
 
-    <h2>🎮 O‘yinni boshlash</h2>
+  <input id="nameInput" placeholder="Ismingizni kiriting" autocomplete="off">
 
-    <input id="nameInput" placeholder="Ismingizni kiriting">
+  <label for="questionMode">🎯 Savollar soni</label>
+  <select id="questionMode">
+    <option value="10">10 ta savol</option>
+    <option value="20">20 ta savol</option>
+    <option value="30">30 ta savol</option>
+  </select>
 
-    <label class="mode-label" for="questionMode">🎯 Savollar soni</label>
-    <select id="questionMode" class="mode-select">
-        <option value="10">10 ta savol</option>
-        <option value="20">20 ta savol</option>
-        <option value="30">30 ta savol</option>
-    </select>
+  <button onclick="createRoom()">🏠 Xona yaratish</button>
 
-    <button onclick="createRoom()">
-        🏠 Xona yaratish
-    </button>
+  <hr class="divider">
 
-    <hr style="margin:25px 0;border:none;border-top:1px solid #eee">
+  <input id="roomInput" placeholder="Xona kodini kiriting" autocomplete="off">
+  <button onclick="joinRoom()">🚀 Kod orqali qo‘shilish</button>
 
-    <input id="roomInput" placeholder="Xona kodini kiriting">
-
-    <button onclick="joinRoom()">
-        🚀 Xonaga qo‘shilish
-    </button>
-
-    <div class="small">
-        1-o‘yinchi xona yaratadi. 2-o‘yinchi shu kod orqali kiradi.
+  <div class="public-lobby">
+    <div class="public-head">
+      <h3>🌐 Ochiq xonalar</h3>
+      <button class="secondary refresh-btn" onclick="refreshPublicRooms()">🔄 Yangilash</button>
     </div>
+    <div id="roomsStatus" class="small">⏳ Xonalar yuklanmoqda...</div>
+    <div id="roomsList" class="rooms-list"></div>
+  </div>
 
+  <div class="small">Ochiq xonaga kirishda kod kerak emas — <b>Qo‘shilish</b> tugmasini bosing.</div>
 </div>
-
 
 <!-- WAITING -->
 <div id="waitingScreen" class="card hidden">
+  <h2 style="text-align:center;margin-top:0">🏠 Xona tayyor</h2>
+  <p style="text-align:center">Xona kodi:</p>
+  <div id="roomCode" class="room">------</div>
+  <div id="connectionStatus" class="status">⏳ O‘yinchilar kutilmoqda...</div>
 
-    <h2 style="text-align:center">🏠 Xona yaratildi</h2>
+  <div id="waitingPlayers" class="waiting-list"></div>
 
-    <p style="text-align:center">
-        Do‘stingizga quyidagi kodni yuboring:
-    </p>
-
-    <div id="roomCode" class="room">------</div>
-
-    <div id="connectionStatus" class="status">
-        ⏳ Ikkinchi o‘yinchi kutilmoqda...
-    </div>
-
+  <button id="startGameBtn" class="hidden" onclick="startMultiplayerGame()">▶️ O‘yinni boshlash</button>
+  <button class="secondary" onclick="copyRoomCode()">📋 Kodni nusxalash</button>
 </div>
-
 
 <!-- GAME -->
 <div id="gameScreen" class="card hidden">
+  <div class="top-line">
+    <div id="questionNumber" class="question-number">1 / 10</div>
+    <div id="myBadge" class="my-badge">Siz</div>
+  </div>
 
-    <div class="players">
+  <div id="timerText" class="timer-text">⏱️ 15 soniya</div>
+  <div class="timer"><div id="timerBar" class="timer-bar"></div></div>
 
-        <div class="player">
-            <div id="hostName" class="player-name">Player 1</div>
-            <div id="hostScore" class="score">0</div>
-        </div>
+  <div id="feedback" class="feedback"></div>
+  <div id="word" class="word">학교</div>
+  <div id="answers" class="answers"></div>
 
-        <div class="player">
-            <div id="guestName" class="player-name">Player 2</div>
-            <div id="guestScore" class="score">0</div>
-        </div>
-
-    </div>
-
-    <div class="power-hud">
-                <div class="power-item"><div class="power-label">Player 1 🔥 Combo</div><div id="hostCombo" class="power-value"><span class="combo-badge">x0</span></div></div>
-        <div class="power-item"><div class="power-label">Player 2 🔥 Combo</div><div id="guestCombo" class="power-value"><span class="combo-badge">x0</span></div></div>
-    </div>
-
-    <div id="questionNumber" class="question-number">
-        1 / 10
-    </div>
-
-    <div id="timerText" class="timer-text">⏱️ 15 soniya</div>
-    <div class="timer">
-        <div id="timerBar" class="timer-bar"></div>
-    </div>
-
-    <div id="feedback" class="feedback"></div>
-
-    <div id="word" class="word">
-        학교
-    </div>
-
-    <div id="answers" class="answers"></div>
-
-    <div class="leaderboard">
-        <div class="leaderboard-title">🏆 Leaderboard</div>
-        <div id="leaderboardList"></div>
-    </div>
-
+  <div class="players-board">
+    <div class="board-title">🏆 Leaderboard</div>
+    <div id="playersBoard"></div>
+  </div>
 </div>
-
 
 <!-- RESULT -->
 <div id="resultScreen" class="card hidden result">
-
-    <div class="trophy" id="resultTrophy">🏆</div>
-
-    <h2>O‘yin tugadi!</h2>
-
-    <div id="winner" class="winner"></div>
-    <div id="winnerSubtitle" class="winner-subtitle"></div>
-
-    <div id="finalScore"></div>
-
-    <div id="statsGrid" class="stats-grid"></div>
-
-    <button onclick="location.reload()">
-        🔄 Yana o‘ynash
-    </button>
-
+  <div class="trophy" id="resultTrophy">🏆</div>
+  <h2>O‘yin tugadi!</h2>
+  <div id="winner" class="winner"></div>
+  <div id="winnerSubtitle" class="winner-subtitle"></div>
+  <div id="finalScore" class="final-score"></div>
+  <div id="finalTable" class="final-table"></div>
+  <div id="statsGrid" class="stats-grid"></div>
+  <button onclick="location.reload()">🔄 Yana o‘ynash</button>
 </div>
 
 </div>
-
 
 <script>
-
-let questionCount = 10;
-
-function generateQuestions(count){
-
-    const shuffledWordBank = [...wordBank]
-        .sort(() => Math.random() - 0.5)
-        .slice(0, count);
-
-    return shuffledWordBank.map(item => {
-
-        const wrongAnswers = wordBank
-            .filter(x => x.uzbek !== item.uzbek)
-            .sort(() => Math.random() - 0.5)
-            .slice(0, 3)
-            .map(x => x.uzbek);
-
-        const answers = [
-            item.uzbek,
-            ...wrongAnswers
-        ].sort(() => Math.random() - 0.5);
-
-        return {
-            word: item.korean,
-            answers: answers,
-            correct: item.uzbek
-        };
-
-    });
-}
-
-let questions = generateQuestions(10);
+/* =========================================================
+   F-TOPIK WORD BATTLE — 2 to 10 players + public lobby
+   PeerJS = real-time game traffic
+   Firebase RTDB = public room list only
+========================================================= */
+const MAX_PLAYERS = 10;
+const GAME_TIME = 15;
 
 let peer = null;
-let connection = null;
-
+let hostConnection = null;
+let guestConnections = {};
 let isHost = false;
-
+let gameStarted = false;
 let myName = "";
-let opponentName = "";
-
-let myScore = 0;
-let opponentScore = 0;
-
-let myCombo = 0;
-let opponentCombo = 0;
-let myMaxCombo = 0;
-let opponentMaxCombo = 0;
-
-let myCorrect = 0;
-let myWrong = 0;
-let myFastBonus = 0;
-let myAnswerTime = 0;
-let myAnswers = 0;
-
-let opponentCorrect = 0;
-let opponentWrong = 0;
-let opponentFastBonus = 0;
-let opponentAnswerTime = 0;
-let opponentAnswers = 0;
-
+let myPlayerId = "";
+let hostPeerId = "";
+let roomCode = "";
+let questionCount = 10;
+let questions = [];
+let players = {};
 let currentQuestion = 0;
 let answered = false;
-let hostAnswered = false;
-let guestAnswered = false;
 let questionChanging = false;
-
 let timer = null;
-let timeLeft = 15;
+let timeLeft = GAME_TIME;
+let lobbyRoomRef = null;
+let lobbyAvailable = false;
+let firebaseDb = null;
+let firebaseAuth = null;
+let firebaseUser = null;
+let roomsUnsubscribe = null;
+let startRequested = false;
 
-let roomCode = "";
+/* ---------- Firebase lobby ---------- */
+function validFirebaseConfig(config){
+  return !!config &&
+    config.apiKey && !config.apiKey.includes("PASTE_") &&
+    config.projectId && !config.projectId.includes("PASTE_") &&
+    config.databaseURL && !config.databaseURL.includes("PASTE_");
+}
 
+function initFirebaseLobby(){
+  if(!validFirebaseConfig(window.FTOPIK_FIREBASE_CONFIG)){
+    lobbyAvailable = false;
+    setRoomsStatus("⚠️ Ochiq xonalar uchun Firebase sozlamasi hali kiritilmagan.");
+    return Promise.resolve(false);
+  }
 
-/* =========================
-   RANDOM ROOM CODE
-========================= */
+  try{
+    const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(window.FTOPIK_FIREBASE_CONFIG);
+    firebaseDb = app.database();
+    firebaseAuth = app.auth();
+    return firebaseAuth.signInAnonymously().then(function(){
+      firebaseUser = firebaseAuth.currentUser;
+      lobbyAvailable = true;
+      watchPublicRooms();
+      return true;
+    }).catch(function(err){
+      console.error("Firebase auth error", err);
+      lobbyAvailable = false;
+      setRoomsStatus("⚠️ Firebase autentifikatsiyasi ishlamadi. Sozlamani tekshiring.");
+      return false;
+    });
+  }catch(err){
+    console.error("Firebase init error", err);
+    lobbyAvailable = false;
+    setRoomsStatus("⚠️ Firebase ulanishida xatolik.");
+    return Promise.resolve(false);
+  }
+}
 
+function setRoomsStatus(message){
+  const el = document.getElementById("roomsStatus");
+  if(el) el.textContent = message;
+}
+
+function watchPublicRooms(){
+  if(!lobbyAvailable || !firebaseDb) return;
+  if(roomsUnsubscribe) return;
+  const ref = firebaseDb.ref("rooms");
+  const callback = function(snapshot){
+    const data = snapshot.val() || {};
+    renderPublicRooms(data);
+  };
+  ref.on("value", callback);
+  roomsUnsubscribe = {ref:ref, callback:callback};
+}
+
+function refreshPublicRooms(){
+  if(!lobbyAvailable){
+    initFirebaseLobby();
+    return;
+  }
+  setRoomsStatus("🔄 Yangilanmoqda...");
+  firebaseDb.ref("rooms").once("value").then(function(snapshot){
+    renderPublicRooms(snapshot.val() || {});
+  });
+}
+
+function renderPublicRooms(data){
+  const list = document.getElementById("roomsList");
+  if(!list) return;
+  list.innerHTML = "";
+
+  const rooms = Object.keys(data || {}).map(function(key){
+    return data[key];
+  }).filter(function(room){
+    return room && room.started !== true &&
+      Number(room.playersCount) < Number(room.maxPlayers || MAX_PLAYERS);
+  }).sort(function(a,b){
+    return Number(a.createdAt || 0) - Number(b.createdAt || 0);
+  });
+
+  setRoomsStatus(rooms.length ? ("✅ " + rooms.length + " ta ochiq xona") : "Hozircha ochiq xona yo‘q.");
+
+  if(!rooms.length){
+    list.innerHTML = '<div class="empty-rooms">Hozir xona yaratgan hech kim yo‘q.</div>';
+    return;
+  }
+
+  rooms.forEach(function(room){
+    const row = document.createElement("div");
+    row.className = "room-row";
+
+    const main = document.createElement("div");
+    main.className = "room-main";
+
+    const title = document.createElement("div");
+    title.className = "room-title";
+    title.textContent = "👤 " + (room.hostName || "O‘qituvchi");
+
+    const meta = document.createElement("div");
+    meta.className = "room-meta";
+    meta.textContent = (Number(room.questionCount) || 10) + " savol • " +
+      (Number(room.playersCount) || 1) + "/" + (Number(room.maxPlayers) || MAX_PLAYERS) + " o‘yinchi";
+
+    main.appendChild(title);
+    main.appendChild(meta);
+
+    const btn = document.createElement("button");
+    btn.className = "join-public";
+    btn.textContent = "Qo‘shilish";
+    btn.type = "button";
+    btn.onclick = function(){
+      joinPublicRoom(room);
+    };
+
+    row.appendChild(main);
+    row.appendChild(btn);
+    list.appendChild(row);
+  });
+}
+
+function registerPublicRoom(){
+  if(!lobbyAvailable || !firebaseDb || !firebaseUser) return;
+  lobbyRoomRef = firebaseDb.ref("rooms/" + roomCode);
+  const roomData = {
+    hostUid: firebaseUser.uid,
+    hostPeerId: hostPeerId,
+    roomCode: roomCode,
+    hostName: myName,
+    questionCount: questionCount,
+    playersCount: 1,
+    maxPlayers: MAX_PLAYERS,
+    started: false,
+    createdAt: firebase.database.ServerValue.TIMESTAMP,
+    updatedAt: firebase.database.ServerValue.TIMESTAMP
+  };
+
+  lobbyRoomRef.set(roomData).then(function(){
+    return lobbyRoomRef.onDisconnect().remove();
+  }).catch(function(err){
+    console.error("Lobby room write error", err);
+  });
+}
+
+function updatePublicRoomCount(){
+  if(!isHost || !lobbyRoomRef) return;
+  lobbyRoomRef.update({
+    playersCount: Object.keys(players).length,
+    updatedAt: firebase.database.ServerValue.TIMESTAMP
+  }).catch(function(err){
+    console.error("Lobby count update error", err);
+  });
+}
+
+function removePublicRoom(){
+  if(lobbyRoomRef){
+    try{ lobbyRoomRef.onDisconnect().cancel(); }catch(e){}
+    lobbyRoomRef.remove().catch(function(err){ console.error(err); });
+    lobbyRoomRef = null;
+  }
+}
+
+/* ---------- Helpers ---------- */
 function generateCode(){
-
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-    let result = "";
-
-    for(let i=0;i<6;i++){
-        result += chars[Math.floor(Math.random()*chars.length)];
-    }
-
-    return result;
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let result = "";
+  for(let i=0;i<6;i++) result += chars[Math.floor(Math.random()*chars.length)];
+  return result;
 }
 
-
-/* =========================
-   CREATE ROOM
-========================= */
-
-function createRoom(){
-
-    myName = document.getElementById("nameInput").value.trim();
-    questionCount = Number(document.getElementById("questionMode").value) || 10;
-
-    questions = generateQuestions(questionCount);
-
-    if(!myName){
-        alert("Avval ismingizni kiriting!");
-        return;
-    }
-
-    isHost = true;
-
-    roomCode = generateCode();
-
-    peer = new Peer(roomCode.toLowerCase());
-
-    peer.on("open", function(id){
-
-        document.getElementById("startScreen").classList.add("hidden");
-
-        document.getElementById("waitingScreen").classList.remove("hidden");
-
-        document.getElementById("roomCode").textContent =
-            roomCode;
-
-    });
-
-
-    peer.on("connection", function(conn){
-
-        connection = conn;
-
-        setupConnection();
-
-    });
-
-
-    peer.on("error", function(error){
-
-        console.log(error);
-
-        if(error.type === "unavailable-id"){
-
-            peer.destroy();
-
-            createRoom();
-
-        }else{
-
-            alert("Ulanishda xatolik: " + error.type);
-
-        }
-
-    });
-
-}
-
-
-/* =========================
-   JOIN ROOM
-========================= */
-
-function joinRoom(){
-
-    myName = document.getElementById("nameInput").value.trim();
-
-    roomCode = document.getElementById("roomInput").value.trim().toUpperCase();
-
-    if(!myName){
-
-        alert("Avval ismingizni kiriting!");
-
-        return;
-
-    }
-
-    if(!roomCode){
-
-        alert("Xona kodini kiriting!");
-
-        return;
-
-    }
-
-    isHost = false;
-
-    peer = new Peer();
-
-    peer.on("open", function(){
-
-        connection = peer.connect(
-            roomCode.toLowerCase(),
-            {reliable:true}
-        );
-
-        setupConnection();
-
-    });
-
-
-    peer.on("error", function(error){
-
-        alert("Xonaga ulanib bo‘lmadi. Kodni tekshiring.");
-
-        console.log(error);
-
-    });
-
-}
-
-
-/* =========================
-   CONNECTION
-========================= */
-
-function setupConnection(){
-
-    connection.on("open", function(){
-
-        connection.send({
-
-            type:"join",
-
-            name:myName
-
-        });
-
-
-        if(isHost){
-
-            document.getElementById("connectionStatus").textContent =
-                "✅ Ikkinchi o‘yinchi qo‘shildi! O‘yin boshlanmoqda...";
-
-        }
-
-    });
-
-
-    connection.on("data", function(data){
-
-        handleData(data);
-
-    });
-
-
-    connection.on("close", function(){
-
-        alert("Ikkinchi o‘yinchi o‘yindan chiqdi.");
-
-    });
-
-}
-
-
-/* =========================
-   DATA
-========================= */
-
-function handleData(data){
-
-
-    if(data.type === "join"){
-
-        opponentName = data.name;
-
-        if(isHost){
-
-            startGame();
-
-        }
-
-    }
-
-
-    if(data.type === "start"){
-
-        opponentName = data.hostName;
-        questions = Array.isArray(data.questions) ? data.questions : [];
-        questionCount = Number(data.questionCount) || questions.length || 10;
-        startGame();
-
-    }
-
-
-    if(data.type === "score"){
-
-        if(data.question !== currentQuestion) return;
-
-        opponentScore = Number(data.score) || 0;
-        opponentCombo = typeof data.combo === "number" ? data.combo : opponentCombo;
-        opponentMaxCombo = typeof data.maxCombo === "number" ? data.maxCombo : opponentMaxCombo;
-        setOpponentStats(data.stats);
-        guestAnswered = true;
-        updateScores();
-        showOpponentFeedback(data);
-        checkBothAnswered();
-    }
-
-
-    if(data.type === "next"){
-
-        currentQuestion = data.question;
-
-        showQuestion();
-
-    }
-
-
-    if(data.type === "timeout"){
-
-        if(isHost && data.question === currentQuestion && !guestAnswered){
-            opponentCombo = 0;
-            opponentScore = typeof data.score === "number" ? data.score : opponentScore;
-            opponentMaxCombo = typeof data.maxCombo === "number" ? data.maxCombo : opponentMaxCombo;
-            setOpponentStats(data.stats);
-            guestAnswered = true;
-            updateScores();
-            showFeedback("⏰ Raqib vaqtida javob bermadi");
-            checkBothAnswered();
-        }
-
-    }
-
-
-    if(data.type === "finish"){
-
-        opponentScore = data.opponentScore;
-        opponentMaxCombo = typeof data.guestMaxCombo === "number" ? data.guestMaxCombo : opponentMaxCombo;
-        setOpponentStats(isHost ? data.guestStats : data.hostStats);
-        showResult(data.hostScore, data.hostStats, data.guestStats);
-
-    }
-
-}
-
-
-function getMyStats(){
+function generateQuestions(count){
+  if(typeof wordBank === "undefined" || !Array.isArray(wordBank)) return [];
+  const safeCount = Math.min(Number(count) || 10, wordBank.length);
+  const shuffledWordBank = [...wordBank].sort(function(){return Math.random()-0.5;}).slice(0, safeCount);
+  return shuffledWordBank.map(function(item){
+    const wrongAnswers = wordBank
+      .filter(function(x){return x.uzbek !== item.uzbek;})
+      .sort(function(){return Math.random()-0.5;})
+      .slice(0,3)
+      .map(function(x){return x.uzbek;});
     return {
-        correct: myCorrect,
-        wrong: myWrong,
-        fastBonus: myFastBonus,
-        maxCombo: myMaxCombo,
-        answers: myAnswers,
-        answerTime: myAnswerTime
+      word:item.korean,
+      answers:[item.uzbek, ...wrongAnswers].sort(function(){return Math.random()-0.5;}),
+      correct:item.uzbek
     };
+  });
 }
 
-function resetStats(){
-    myCorrect = 0;
-    myWrong = 0;
-    myFastBonus = 0;
-    myAnswerTime = 0;
-    myAnswers = 0;
-
-    opponentCorrect = 0;
-    opponentWrong = 0;
-    opponentFastBonus = 0;
-    opponentAnswerTime = 0;
-    opponentAnswers = 0;
+function createPlayer(id,name){
+  return {
+    id:id,
+    name:String(name || "Player").trim().slice(0,30) || "Player",
+    score:0,
+    combo:0,
+    maxCombo:0,
+    correct:0,
+    wrong:0,
+    fastBonus:0,
+    answerTime:0,
+    answers:0,
+    answered:false,
+    connected:true
+  };
 }
 
-function setOpponentStats(stats){
-    stats = stats || {};
-    opponentCorrect = Number(stats.correct) || 0;
-    opponentWrong = Number(stats.wrong) || 0;
-    opponentFastBonus = Number(stats.fastBonus) || 0;
-    opponentAnswerTime = Number(stats.answerTime) || 0;
-    opponentAnswers = Number(stats.answers) || 0;
-    opponentMaxCombo = Number(stats.maxCombo) || opponentMaxCombo;
+function ensurePlayer(id,name){
+  if(!players[id]) players[id] = createPlayer(id,name);
+  if(name && players[id].name === "Player") players[id].name = String(name).slice(0,30);
+  return players[id];
 }
 
-function accuracyFor(stats){
-    if(!stats || !stats.answers) return 0;
-    return Math.round((stats.correct / stats.answers) * 100);
+function me(){
+  return players[myPlayerId] || null;
 }
 
-function averageTimeFor(stats){
-    if(!stats || !stats.answers) return 0;
-    return (stats.answerTime / stats.answers).toFixed(1);
+function activePlayers(){
+  return Object.values(players).filter(function(p){ return p && p.connected !== false; });
 }
 
-function buildStatsHtml(name, score, stats){
-    const s = stats || {};
-    return '<div class="stats-card">' +
-        '<div class="stats-card-title">' + escapeHtml(name) + ' • ' + score + ' ball</div>' +
-        '<div class="stats-row"><span>✅ To‘g‘ri</span><span class="stats-value">' + (Number(s.correct)||0) + '</span></div>' +
-        '<div class="stats-row"><span>❌ Xato/vaqt</span><span class="stats-value">' + (Number(s.wrong)||0) + '</span></div>' +
-        '<div class="stats-row"><span>🎯 Aniqlik</span><span class="stats-value">' + accuracyFor(s) + '%</span></div>' +
-        '<div class="stats-row"><span>🔥 Max combo</span><span class="stats-value">x' + (Number(s.maxCombo)||0) + '</span></div>' +
-        '<div class="stats-row"><span>⚡ Tezlik bonusi</span><span class="stats-value">+' + (Number(s.fastBonus)||0) + '</span></div>' +
-        '<div class="stats-row"><span>⏱️ O‘rtacha vaqt</span><span class="stats-value">' + averageTimeFor(s) + ' s</span></div>' +
-        '</div>';
+function sortedPlayers(){
+  return Object.values(players).sort(function(a,b){
+    return Number(b.score||0) - Number(a.score||0) || Number(b.maxCombo||0) - Number(a.maxCombo||0);
+  });
 }
 
-function launchConfetti(){
-    const symbols = ['🎉','✨','🎊','💜','⭐'];
-    for(let i=0;i<28;i++){
-        const piece = document.createElement('div');
-        piece.className = 'confetti-piece';
-        piece.textContent = symbols[Math.floor(Math.random()*symbols.length)];
-        piece.style.left = (Math.random()*100) + 'vw';
-        piece.style.animationDelay = (Math.random()*0.8) + 's';
-        piece.style.transform = 'rotate(' + (Math.random()*180) + 'deg)';
-        document.body.appendChild(piece);
-        setTimeout(function(){ piece.remove(); }, 3600);
+function stateForWire(p){
+  return {
+    id:p.id,name:p.name,score:p.score,combo:p.combo,maxCombo:p.maxCombo,
+    correct:p.correct,wrong:p.wrong,fastBonus:p.fastBonus,
+    answerTime:p.answerTime,answers:p.answers,answered:p.answered,connected:p.connected
+  };
+}
+
+function serializePlayers(){
+  const out = {};
+  Object.keys(players).forEach(function(id){ out[id] = stateForWire(players[id]); });
+  return out;
+}
+
+function applyPlayers(data){
+  if(!data) return;
+  players = {};
+  Object.keys(data).forEach(function(id){
+    players[id] = Object.assign(createPlayer(id,data[id] && data[id].name), data[id] || {});
+    players[id].id = id;
+  });
+  renderPlayersBoard();
+}
+
+function broadcast(message){
+  Object.keys(guestConnections).forEach(function(id){
+    const conn = guestConnections[id];
+    if(conn && conn.open){
+      try{ conn.send(message); }catch(e){ console.error(e); }
     }
+  });
 }
 
-/* =========================
-   START GAME
-========================= */
-
-function startGame(){
-
-    document.getElementById("waitingScreen").classList.add("hidden");
-
-    document.getElementById("gameScreen").classList.remove("hidden");
-
-    if(isHost){
-
-        opponentName = opponentName || "Player 2";
-
-        if(!Array.isArray(questions) || questions.length === 0){
-
-            alert("Savollar yuklanmadi. Sahifani Ctrl + F5 bilan yangilang.");
-
-            return;
-
-        }
-
-        connection.send({
-
-            type:"start",
-
-            hostName:myName,
-
-            questionCount:questionCount,
-
-            questions:questions
-
-        });
-
-    }
-
-    document.getElementById("hostName").textContent =
-        isHost ? myName : opponentName;
-
-    document.getElementById("guestName").textContent =
-        isHost ? opponentName : myName;
-
-    currentQuestion = 0;
-    questionChanging = false;
-    myScore = 0;
-    opponentScore = 0;
-    myCombo = 0;
-    opponentCombo = 0;
-    myMaxCombo = 0;
-    opponentMaxCombo = 0;
-    resetStats();
-    updateScores();
-
-    showQuestion();
-
+function broadcastScores(){
+  renderPlayersBoard();
+  if(isHost) broadcast({type:"players", players:serializePlayers()});
 }
 
-
-/* =========================
-   SHOW QUESTION
-========================= */
-
-function showQuestion(){
-
-    answered = false;
-    hostAnswered = false;
-    guestAnswered = false;
-    questionChanging = false;
-
-    clearInterval(timer);
-    document.getElementById("feedback").textContent = "";
-
-    if(currentQuestion >= questions.length){
-        finishGame();
-        return;
-    }
-
-    const q = questions[currentQuestion];
-
-    if(!q){
-        console.error("Savol topilmadi:", currentQuestion);
-        return;
-    }
-
-    document.getElementById("questionNumber").textContent =
-        (currentQuestion + 1) + " / " + questions.length;
-
-    document.getElementById("word").textContent = q.word;
-
-    const answersBox = document.getElementById("answers");
-    answersBox.innerHTML = "";
-
-    let answerList = Array.isArray(q.answers) ? [...q.answers] : [];
-
-    // Agar 4 ta variant bo‘lmasa, questions.js dagi wordBankdan yaratadi
-    if(answerList.length < 4 && typeof wordBank !== "undefined"){
-
-        const wrongAnswers = wordBank
-            .filter(x => x.uzbek !== q.correct)
-            .sort(() => Math.random() - 0.5)
-            .slice(0, 3)
-            .map(x => x.uzbek);
-
-        answerList = [q.correct, ...wrongAnswers];
-    }
-
-    answerList = [...new Set(answerList)];
-
-    // 4 ta variant bo‘lishini ta’minlash
-    if(answerList.length > 4){
-        answerList = answerList.slice(0, 4);
-    }
-
-    answerList.sort(() => Math.random() - 0.5);
-
-    answerList.forEach(answer => {
-
-        const btn = document.createElement("button");
-
-        btn.className = "answer";
-        btn.type = "button";
-        btn.textContent = answer;
-
-        btn.onclick = function(){
-            answerQuestion(answer, btn);
-        };
-
-        answersBox.appendChild(btn);
-    });
-
-    timeLeft = 15;
-    updateTimer();
-
-    timer = setInterval(function(){
-
-        timeLeft--;
-        updateTimer();
-
-        if(timeLeft <= 0){
-
-            clearInterval(timer);
-            disableAnswers();
-
-            if(!answered){
-                answered = true;
-                myCombo = 0;
-                myWrong++;
-                myAnswers++;
-                updateScores();
-                showFeedback("⏰ Vaqt tugadi!");
-
-                if(isHost){
-                    hostAnswered = true;
-                    if(connection){
-                        connection.send({
-                            type:"score", score:myScore, combo:myCombo,
-                            maxCombo:myMaxCombo, correct:false, fastBonus:0,
-                            question:currentQuestion, stats:getMyStats()
-                        });
-                    }
-                }else if(connection){
-                    connection.send({
-                        type:"timeout", score:myScore, combo:myCombo,
-                        maxCombo:myMaxCombo, question:currentQuestion, stats:getMyStats()
-                    });
-                }
-            }
-
-            if(isHost && !questionChanging){
-                nextQuestion();
-            }
-        }
-
-    },1000);
+function sendToGuest(id,message){
+  const conn = guestConnections[id];
+  if(conn && conn.open){
+    try{conn.send(message);}catch(e){console.error(e);}
+  }
 }
 
-
-/* =========================
-   TIMER
-========================= */
-
-function updateTimer(){
-
-    document.getElementById("timerBar").style.width =
-        (timeLeft / 15 * 100) + "%";
-
-    document.getElementById("timerText").textContent =
-        "⏱️ " + timeLeft + " soniya";
-
+function resetQuestionFlags(){
+  Object.keys(players).forEach(function(id){ players[id].answered = false; });
 }
 
-
-/* =========================
-   ANSWER
-========================= */
-
-function answerQuestion(answer, button){
-
-    if(answered) return;
-
-    answered = true;
-
-    clearInterval(timer);
-
-    const correct = questions[currentQuestion].correct === answer;
-    const secondsLeftAtAnswer = timeLeft;
-    let fastBonus = 0;
-    let comboBonus = 0;
-    let totalPoints = 0;
-
-    myAnswers++;
-    myAnswerTime += Math.max(0, 15 - secondsLeftAtAnswer);
-
-    if(correct){
-        myCorrect++;
-        button.classList.add("correct");
-        myCombo++;
-        myMaxCombo = Math.max(myMaxCombo, myCombo);
-        fastBonus = getFastBonus(secondsLeftAtAnswer);
-        myFastBonus += fastBonus;
-        comboBonus = Math.min((myCombo - 1) * 2, 10);
-        totalPoints = 10 + fastBonus + comboBonus;
-        myScore += totalPoints;
-        showFeedback("✅ To‘g‘ri! +" + totalPoints + " ball" + (fastBonus ? " ⚡+" + fastBonus : "") + (comboBonus ? " 🔥+" + comboBonus : ""));
-    }else{
-        myWrong++;
-        myCombo = 0;
-        document.querySelectorAll(".answer").forEach(function(btn){
-            if(btn.textContent === questions[currentQuestion].correct){
-                btn.classList.add("correct");
-            }
-        });
-        showFeedback("❌ Noto‘g‘ri!");
-    }
-
-    disableAnswers();
-    updateScores();
-
-    const payload = {
-        type:"score",
-        score:myScore,
-        combo:myCombo,
-        maxCombo:myMaxCombo,
-        correct:correct,
-        fastBonus:fastBonus,
-        question:currentQuestion,
-        stats:getMyStats()
-    };
-
-    if(!isHost && connection) connection.send(payload);
-
-    if(isHost){
-        hostAnswered = true;
-        checkBothAnswered();
-    }
-
+function checkAllAnswered(){
+  if(!isHost || questionChanging || !gameStarted) return;
+  const active = activePlayers();
+  if(active.length < 2) return;
+  if(active.every(function(p){return p.answered;})){
+    const q = currentQuestion;
+    setTimeout(function(){
+      if(isHost && currentQuestion === q && !questionChanging) nextQuestion();
+    },350);
+  }
 }
 
 function getFastBonus(secondsLeft){
-    if(secondsLeft >= 13) return 5;
-    if(secondsLeft >= 10) return 4;
-    if(secondsLeft >= 7) return 3;
-    if(secondsLeft >= 4) return 2;
-    if(secondsLeft >= 1) return 1;
-    return 0;
-}
-
-function showFeedback(message){
-    const el = document.getElementById("feedback");
-    if(el) el.textContent = message || "";
-}
-
-function showOpponentFeedback(data){
-    if(data.correct){
-        let msg = "🔥 Raqib to‘g‘ri javob berdi";
-        if(data.fastBonus) msg += " ⚡+" + data.fastBonus;
-        showFeedback(msg);
-    }else{
-        showFeedback("❌ Raqib xato qildi");
-    }
-}
-
-function checkBothAnswered(){
-
-    if(hostAnswered && guestAnswered && !questionChanging){
-        clearInterval(timer);
-        const waitingQuestion = currentQuestion;
-        setTimeout(function(){
-            if(currentQuestion === waitingQuestion && !questionChanging){
-                nextQuestion();
-            }
-        },500);
-    }
-}
-
-/* =========================
-   DISABLE ANSWERS
-========================= */
-
-function disableAnswers(){
-
-    document.querySelectorAll(".answer").forEach(btn => {
-
-        btn.disabled = true;
-
-    });
-
-}
-
-
-/* =========================
-   UPDATE SCORE
-========================= */
-
-function updateScores(){
-
-    document.getElementById("hostScore").textContent =
-        isHost ? myScore : opponentScore;
-
-    document.getElementById("guestScore").textContent =
-        isHost ? opponentScore : myScore;
-
-    updatePowerHud();
-    updateLeaderboard();
-
-}
-
-function updatePowerHud(){
-
-    const hostCombo = isHost ? myCombo : opponentCombo;
-    const guestCombo = isHost ? opponentCombo : myCombo;
-
-    const hostComboEl = document.getElementById("hostCombo");
-    const guestComboEl = document.getElementById("guestCombo");
-
-    if(hostComboEl) hostComboEl.innerHTML = '<span class="combo-badge">x' + hostCombo + '</span>';
-    if(guestComboEl) guestComboEl.innerHTML = '<span class="combo-badge">x' + guestCombo + '</span>';
-
-}
-
-function updateLeaderboard(){
-
-    const list = document.getElementById("leaderboardList");
-    if(!list) return;
-
-    const players = [
-        { name: document.getElementById("hostName").textContent || "Player 1", score: isHost ? myScore : opponentScore },
-        { name: document.getElementById("guestName").textContent || "Player 2", score: isHost ? opponentScore : myScore }
-    ].sort((a,b) => b.score - a.score);
-
-    const medals = ["🥇","🥈"];
-    list.innerHTML = players.map(function(player,index){
-        return '<div class="leaderboard-row ' + (index === 0 ? 'first' : '') + '">' +
-               '<div class="leaderboard-rank">' + medals[index] + '</div>' +
-               '<div class="leaderboard-name">' + escapeHtml(player.name) + '</div>' +
-               '<div class="leaderboard-score">' + player.score + '</div>' +
-               '</div>';
-    }).join("");
-
+  if(secondsLeft >= 13) return 5;
+  if(secondsLeft >= 10) return 4;
+  if(secondsLeft >= 7) return 3;
+  if(secondsLeft >= 4) return 2;
+  if(secondsLeft >= 1) return 1;
+  return 0;
 }
 
 function escapeHtml(value){
-    return String(value).replace(/[&<>\"']/g, function(ch){
-        return ({
-            '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
-        })[ch];
-    });
+  return String(value).replace(/[&<>\"']/g,function(ch){
+    return ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"})[ch];
+  });
 }
 
+/* ---------- Room creation/join ---------- */
+function createRoom(){
+  myName = document.getElementById("nameInput").value.trim();
+  questionCount = Number(document.getElementById("questionMode").value) || 10;
+  if(!myName){ alert("Avval ismingizni kiriting!"); return; }
+  if(!Array.isArray(wordBank) || wordBank.length < questionCount){
+    alert("Savollar bazasi yetarli emas. questions.js ni tekshiring."); return;
+  }
 
-/* =========================
-   NEXT QUESTION
-========================= */
+  isHost = true;
+  gameStarted = false;
+  startRequested = false;
+  roomCode = generateCode();
+  hostPeerId = roomCode.toLowerCase();
+  myPlayerId = hostPeerId;
+  players = {};
+  players[myPlayerId] = createPlayer(myPlayerId,myName);
+
+  peer = new Peer(hostPeerId);
+  peer.on("open",function(){
+    showWaitingScreen();
+    registerPublicRoom();
+  });
+
+  peer.on("connection",function(conn){
+    guestConnections[conn.peer] = conn;
+    setupConnection(conn);
+  });
+
+  peer.on("error",function(error){
+    console.error(error);
+    if(error.type === "unavailable-id"){
+      try{peer.destroy();}catch(e){}
+      setTimeout(createRoom,150);
+    }else{
+      alert("Ulanishda xatolik: " + (error.type || "noma’lum"));
+    }
+  });
+}
+
+function joinRoom(){
+  myName = document.getElementById("nameInput").value.trim();
+  roomCode = document.getElementById("roomInput").value.trim().toUpperCase();
+  if(!myName){ alert("Avval ismingizni kiriting!"); return; }
+  if(!roomCode){ alert("Xona kodini kiriting!"); return; }
+  connectToHost(roomCode.toLowerCase());
+}
+
+function joinPublicRoom(room){
+  myName = document.getElementById("nameInput").value.trim();
+  if(!myName){ alert("Avval ismingizni kiriting!"); return; }
+  if(!room || !room.hostPeerId || room.started || Number(room.playersCount) >= Number(room.maxPlayers || MAX_PLAYERS)){
+    alert("Bu xona hozir mavjud emas yoki to‘lib qolgan.");
+    refreshPublicRooms();
+    return;
+  }
+  roomCode = String(room.roomCode || "").toUpperCase();
+  connectToHost(String(room.hostPeerId).toLowerCase());
+}
+
+function connectToHost(targetPeerId){
+  isHost = false;
+  gameStarted = false;
+  hostPeerId = targetPeerId;
+  myPlayerId = "";
+  startRequested = false;
+
+  peer = new Peer();
+  peer.on("open",function(id){
+    myPlayerId = id;
+    hostConnection = peer.connect(hostPeerId,{reliable:true});
+    setupConnection(hostConnection);
+    setRoomsStatus("✅ Xonaga ulanilmoqda...");
+  });
+  peer.on("error",function(error){
+    console.error(error);
+    alert("Xonaga ulanib bo‘lmadi. Xona yopilgan bo‘lishi mumkin.");
+  });
+}
+
+function setupConnection(conn){
+  conn.on("open",function(){
+    if(!isHost){
+      conn.send({type:"join",name:myName});
+    }
+  });
+  conn.on("data",function(data){ handleData(data,conn); });
+  conn.on("close",function(){ handleConnectionClose(conn); });
+  conn.on("error",function(err){ console.error("Connection error",err); });
+  if(!isHost) hostConnection = conn;
+}
+
+function handleConnectionClose(conn){
+  const id = conn && conn.peer;
+  if(isHost && id){
+    if(players[id]) players[id].connected = false;
+    delete guestConnections[id];
+    updatePublicRoomCount();
+    broadcastScores();
+    renderWaitingPlayers();
+    if(gameStarted){
+      showFeedback("⚠️ " + ((players[id] && players[id].name) || "O‘yinchi") + " o‘yindan chiqdi");
+      checkAllAnswered();
+    }
+  }else if(!isHost && !gameStarted){
+    alert("Xona egasi bilan aloqa uzildi.");
+    location.reload();
+  }
+}
+
+function handleData(data,conn){
+  if(!data || !data.type) return;
+
+  if(data.type === "join" && isHost){
+    if(gameStarted){
+      sendToGuest(conn.peer,{type:"reject",reason:"O‘yin allaqachon boshlangan."});
+      try{conn.close();}catch(e){}
+      return;
+    }
+
+    const currentCount = Object.keys(players).filter(function(id){return players[id].connected !== false;}).length;
+    if(currentCount >= MAX_PLAYERS){
+      sendToGuest(conn.peer,{type:"reject",reason:"Xona to‘ldi (10/10)."});
+      try{conn.close();}catch(e){}
+      return;
+    }
+
+    const id = conn.peer;
+    players[id] = createPlayer(id,data.name);
+    guestConnections[id] = conn;
+
+    sendToGuest(id,{type:"accepted",playerId:id,hostName:myName,roomCode:roomCode,questionCount:questionCount,players:serializePlayers()});
+    broadcast({type:"waiting",players:serializePlayers(),hostName:myName,questionCount:questionCount});
+    updatePublicRoomCount();
+    renderWaitingPlayers();
+    return;
+  }
+
+  if(data.type === "accepted" && !isHost){
+    myPlayerId = data.playerId || myPlayerId;
+    hostPeerId = hostPeerId || String(data.hostPeerId || "").toLowerCase();
+    roomCode = String(data.roomCode || roomCode).toUpperCase();
+    questionCount = Number(data.questionCount) || 10;
+    applyPlayers(data.players || {});
+    showGuestWaitingScreen();
+    return;
+  }
+
+  if(data.type === "waiting"){
+    applyPlayers(data.players || {});
+    questionCount = Number(data.questionCount) || questionCount;
+    if(!gameStarted) showGuestWaitingScreen();
+    return;
+  }
+
+  if(data.type === "reject"){
+    alert(data.reason || "Xonaga kirish rad etildi.");
+    try{conn.close();}catch(e){}
+    return;
+  }
+
+  if(data.type === "start"){
+    gameStarted = true;
+    hostPeerId = data.hostPeerId || hostPeerId;
+    questionCount = Number(data.questionCount) || Number(data.questions && data.questions.length) || 10;
+    questions = Array.isArray(data.questions) ? data.questions : [];
+    applyPlayers(data.players || {});
+    showGameScreen();
+    currentQuestion = 0;
+    answered = false;
+    questionChanging = false;
+    showQuestion();
+    return;
+  }
+
+  if(data.type === "score" && isHost){
+    const id = conn.peer;
+    if(!gameStarted || data.question !== currentQuestion || !players[id] || players[id].answered) return;
+    const p = players[id];
+    p.score = Number(data.score) || p.score;
+    p.combo = Number(data.combo) || 0;
+    p.maxCombo = Math.max(Number(p.maxCombo)||0, Number(data.maxCombo)||0);
+    p.correct = Number(data.correctTotal) || p.correct;
+    p.wrong = Number(data.wrongTotal) || p.wrong;
+    p.fastBonus = Number(data.fastBonusTotal) || p.fastBonus;
+    p.answerTime = Number(data.answerTimeTotal) || p.answerTime;
+    p.answers = Number(data.answersTotal) || p.answers;
+    p.answered = true;
+    broadcastScores();
+    showFeedback(data.correct ? ("🔥 " + p.name + " to‘g‘ri javob berdi") : ("❌ " + p.name + " xato qildi"));
+    checkAllAnswered();
+    return;
+  }
+
+  if(data.type === "players" && !isHost){
+    applyPlayers(data.players || {});
+    return;
+  }
+
+  if(data.type === "next" && !isHost){
+    currentQuestion = Number(data.question) || 0;
+    answered = false;
+    questionChanging = false;
+    showQuestion();
+    return;
+  }
+
+  if(data.type === "finish"){
+    gameStarted = false;
+    applyPlayers(data.players || {});
+    showResult();
+    return;
+  }
+}
+
+/* ---------- Waiting UI ---------- */
+function showWaitingScreen(){
+  document.getElementById("startScreen").classList.add("hidden");
+  document.getElementById("waitingScreen").classList.remove("hidden");
+  document.getElementById("roomCode").textContent = roomCode;
+  document.getElementById("connectionStatus").textContent = "⏳ O‘yinchilar kutilmoqda...";
+  document.getElementById("startGameBtn").classList.remove("hidden");
+  renderWaitingPlayers();
+}
+
+function showGuestWaitingScreen(){
+  document.getElementById("startScreen").classList.add("hidden");
+  document.getElementById("waitingScreen").classList.remove("hidden");
+  document.getElementById("roomCode").textContent = roomCode || "------";
+  document.getElementById("startGameBtn").classList.add("hidden");
+  document.getElementById("connectionStatus").textContent = "✅ Xonaga kirdingiz. O‘qituvchi o‘yinni boshlashini kuting...";
+  renderWaitingPlayers();
+}
+
+function renderWaitingPlayers(){
+  const box = document.getElementById("waitingPlayers");
+  if(!box) return;
+  const list = sortedPlayers().filter(function(p){return p.connected !== false;});
+  box.innerHTML = list.map(function(p,i){
+    return '<div class="waiting-player"><span class="name">' + (i===0?'👑 ':'👤 ') + escapeHtml(p.name) + '</span><span class="tag">' + (i===0?'Host':'Player '+(i+1)) + '</span></div>';
+  }).join("");
+  if(isHost){
+    const enough = list.length >= 2;
+    document.getElementById("startGameBtn").disabled = !enough;
+    document.getElementById("connectionStatus").textContent = enough ? ("✅ " + list.length + " o‘yinchi tayyor. Boshlash mumkin!") : "⏳ Kamida 2 o‘yinchi kerak.";
+  }
+}
+
+function copyRoomCode(){
+  if(!roomCode) return;
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(roomCode).then(function(){
+      document.getElementById("connectionStatus").textContent = "✅ Kod nusxalandi: " + roomCode;
+    });
+  }else{
+    prompt("Xona kodi:",roomCode);
+  }
+}
+
+/* ---------- Start game ---------- */
+function startMultiplayerGame(){
+  if(!isHost || startRequested) return;
+  const active = activePlayers();
+  if(active.length < 2){ alert("Kamida 2 ta o‘yinchi kerak."); return; }
+  startRequested = true;
+  questionCount = Math.min(Number(questionCount)||10,30);
+  questions = generateQuestions(questionCount);
+  if(questions.length !== questionCount){
+    alert("Savollarni yaratib bo‘lmadi.");
+    startRequested = false;
+    return;
+  }
+  gameStarted = true;
+  currentQuestion = 0;
+  answered = false;
+  questionChanging = false;
+  Object.keys(players).forEach(function(id){
+    const p = players[id];
+    p.score=0;p.combo=0;p.maxCombo=0;p.correct=0;p.wrong=0;p.fastBonus=0;p.answerTime=0;p.answers=0;p.answered=false;
+  });
+  removePublicRoom();
+
+  broadcast({
+    type:"start",
+    hostPeerId:hostPeerId,
+    hostName:myName,
+    questionCount:questionCount,
+    questions:questions,
+    players:serializePlayers()
+  });
+
+  showGameScreen();
+  renderPlayersBoard();
+  showQuestion();
+}
+
+function showGameScreen(){
+  document.getElementById("waitingScreen").classList.add("hidden");
+  document.getElementById("gameScreen").classList.remove("hidden");
+}
+
+/* ---------- Question / timer ---------- */
+function showQuestion(){
+  clearInterval(timer);
+  answered = false;
+  questionChanging = false;
+  resetQuestionFlags();
+  document.getElementById("feedback").textContent = "";
+
+  if(currentQuestion >= questions.length){
+    if(isHost) finishGame();
+    return;
+  }
+
+  const q = questions[currentQuestion];
+  if(!q){ console.error("Savol topilmadi",currentQuestion); return; }
+
+  document.getElementById("questionNumber").textContent = (currentQuestion+1) + " / " + questions.length;
+  document.getElementById("word").textContent = q.word;
+  const my = me();
+  document.getElementById("myBadge").textContent = my ? ("Siz • " + my.score + " ball") : "Siz";
+
+  const answersBox = document.getElementById("answers");
+  answersBox.innerHTML = "";
+  let answerList = Array.isArray(q.answers) ? [...q.answers] : [];
+  if(answerList.length < 4 && typeof wordBank !== "undefined"){
+    const wrong = wordBank.filter(function(x){return x.uzbek !== q.correct;}).sort(function(){return Math.random()-0.5;}).slice(0,3).map(function(x){return x.uzbek;});
+    answerList = [q.correct,...wrong];
+  }
+  answerList = [...new Set(answerList)].slice(0,4).sort(function(){return Math.random()-0.5;});
+
+  answerList.forEach(function(answer){
+    const btn = document.createElement("button");
+    btn.className = "answer";
+    btn.type = "button";
+    btn.textContent = answer;
+    btn.onclick = function(){ answerQuestion(answer,btn); };
+    answersBox.appendChild(btn);
+  });
+
+  timeLeft = GAME_TIME;
+  updateTimer();
+  timer = setInterval(function(){
+    timeLeft--;
+    updateTimer();
+    if(timeLeft <= 0){
+      clearInterval(timer);
+      disableAnswers();
+      if(!answered){
+        if(isHost){
+          recordAnswer(myPlayerId,false,0);
+          broadcastScores();
+          showFeedback("⏰ Vaqt tugadi!");
+          const myP = me();
+          if(myP) myP.answered = true;
+          checkAllAnswered();
+        }else{
+          answerQuestion(null,null,true);
+        }
+      }
+      if(isHost && !questionChanging) nextQuestionIfNeeded();
+    }
+  },1000);
+}
+
+function updateTimer(){
+  document.getElementById("timerBar").style.width = Math.max(0,(timeLeft/GAME_TIME)*100) + "%";
+  document.getElementById("timerText").textContent = "⏱️ " + Math.max(0,timeLeft) + " soniya";
+}
+
+function disableAnswers(){
+  document.querySelectorAll(".answer").forEach(function(btn){btn.disabled=true;});
+}
+
+/* ---------- Scoring ---------- */
+function recordAnswer(id,correct,secondsLeft){
+  const p = players[id];
+  if(!p || p.answered) return;
+  p.answered = true;
+  p.answers++;
+  p.answerTime += Math.max(0,GAME_TIME-secondsLeft);
+
+  if(correct){
+    p.correct++;
+    p.combo++;
+    p.maxCombo=Math.max(p.maxCombo,p.combo);
+    const fast=getFastBonus(secondsLeft);
+    p.fastBonus += fast;
+    const comboBonus=Math.min((p.combo-1)*2,10);
+    p.score += 10 + fast + comboBonus;
+  }else{
+    p.wrong++;
+    p.combo=0;
+  }
+}
+
+function answerQuestion(answer,button,isTimeout){
+  if(answered) return;
+  answered = true;
+
+  const p = me();
+  if(!p) return;
+  const correct = !isTimeout && answer !== null && questions[currentQuestion].correct === answer;
+  const secondsLeftAtAnswer = isTimeout ? 0 : timeLeft;
+  recordAnswer(myPlayerId,correct,secondsLeftAtAnswer);
+
+  if(correct){
+    if(button) button.classList.add("correct");
+    const fast=getFastBonus(secondsLeftAtAnswer);
+    const comboBonus=Math.min((p.combo-1)*2,10);
+    const gained=10+fast+comboBonus;
+    showFeedback("✅ To‘g‘ri! +" + gained + " ball" + (fast ? " ⚡+"+fast : "") + (comboBonus ? " 🔥+"+comboBonus : ""));
+  }else if(isTimeout){
+    showFeedback("⏰ Vaqt tugadi!");
+  }else{
+    document.querySelectorAll(".answer").forEach(function(btn){
+      if(btn.textContent === questions[currentQuestion].correct) btn.classList.add("correct");
+    });
+    if(button) button.classList.add("wrong");
+    showFeedback("❌ Noto‘g‘ri!");
+  }
+
+  disableAnswers();
+  renderPlayersBoard();
+  document.getElementById("myBadge").textContent = "Siz • " + p.score + " ball";
+
+  if(isHost){
+    broadcastScores();
+    checkAllAnswered();
+  }else if(hostConnection && hostConnection.open){
+    hostConnection.send({
+      type:"score",
+      question:currentQuestion,
+      correct:correct,
+      score:p.score,
+      combo:p.combo,
+      maxCombo:p.maxCombo,
+      correctTotal:p.correct,
+      wrongTotal:p.wrong,
+      fastBonusTotal:p.fastBonus,
+      answerTimeTotal:p.answerTime,
+      answersTotal:p.answers
+    });
+  }
+}
+
+function nextQuestionIfNeeded(){
+  const active=activePlayers();
+  if(active.length>=2 && active.every(function(p){return p.answered;})){
+    nextQuestion();
+  }else{
+    // Host timer is authoritative: everyone who has not answered gets a miss.
+    active.forEach(function(p){
+      if(!p.answered) recordAnswer(p.id,false,0);
+    });
+    broadcastScores();
+    nextQuestion();
+  }
+}
 
 function nextQuestion(){
-
-    if(questionChanging) return;
-    questionChanging = true;
-    clearInterval(timer);
-
-    currentQuestion++;
-
-    if(currentQuestion >= questions.length){
-        finishGame();
-        return;
-    }
-
-    if(isHost && connection){
-        connection.send({type:"next", question:currentQuestion});
-    }
-
-    showQuestion();
-
+  if(!isHost || questionChanging || !gameStarted) return;
+  questionChanging=true;
+  clearInterval(timer);
+  currentQuestion++;
+  if(currentQuestion>=questions.length){
+    finishGame();
+    return;
+  }
+  resetQuestionFlags();
+  broadcast({type:"next",question:currentQuestion});
+  showQuestion();
 }
 
-/* =========================
-   FINISH
-========================= */
+/* ---------- Board ---------- */
+function renderPlayersBoard(){
+  const box=document.getElementById("playersBoard");
+  if(!box) return;
+  const list=sortedPlayers();
+  box.innerHTML=list.map(function(p,i){
+    const meClass=p.id===myPlayerId?' me':'';
+    const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.';
+    const combo=p.combo>0?'🔥 x'+p.combo:'';
+    const offline=p.connected===false?' • offline':'';
+    return '<div class="board-row'+meClass+'">' +
+      '<div class="board-rank">'+medal+'</div>' +
+      '<div class="board-name">'+escapeHtml(p.name)+escapeHtml(offline)+'</div>' +
+      '<div class="board-combo">'+combo+'</div>' +
+      '<div class="board-score">'+(Number(p.score)||0)+'</div>' +
+      '</div>';
+  }).join("");
+}
 
+/* ---------- Finish / result ---------- */
 function finishGame(){
-
-    clearInterval(timer);
-
-    if(isHost){
-
-        connection.send({
-            type:"finish",
-            hostScore:myScore,
-            opponentScore:opponentScore,
-            hostMaxCombo:myMaxCombo,
-            guestMaxCombo:opponentMaxCombo,
-            hostStats:getMyStats(),
-            guestStats:{
-                correct:opponentCorrect,
-                wrong:opponentWrong,
-                fastBonus:opponentFastBonus,
-                maxCombo:opponentMaxCombo,
-                answers:opponentAnswers,
-                answerTime:opponentAnswerTime
-            }
-        });
-
-    }
-
-    showResult(isHost ? myScore : opponentScore,
-               isHost ? getMyStats() : null,
-               isHost ? null : getMyStats());
-
+  clearInterval(timer);
+  gameStarted=false;
+  if(isHost){
+    broadcast({type:"finish",players:serializePlayers()});
+  }
+  showResult();
 }
 
-
-/* =========================
-   RESULT
-========================= */
-
-function showResult(hostFinalScore, hostStats, guestStats){
-
-    document.getElementById("gameScreen").classList.add("hidden");
-    document.getElementById("resultScreen").classList.remove("hidden");
-
-    let player1Score = isHost ? myScore : hostFinalScore;
-    let player2Score = isHost ? opponentScore : myScore;
-
-    // If this is the guest, use the host/guest stats received from the finish message.
-    let player1Stats = isHost ? getMyStats() : (hostStats || {});
-    let player2Stats = isHost ? (guestStats || {
-        correct:opponentCorrect,
-        wrong:opponentWrong,
-        fastBonus:opponentFastBonus,
-        maxCombo:opponentMaxCombo,
-        answers:opponentAnswers,
-        answerTime:opponentAnswerTime
-    }) : getMyStats();
-
-    let winnerText = "";
-    let subtitle = "";
-    let hasWinner = false;
-
-    if(player1Score > player2Score){
-        winnerText = "🏆 " + document.getElementById("hostName").textContent + " g‘olib!";
-        subtitle = "Ajoyib natija! 🎉";
-        hasWinner = true;
-    }else if(player2Score > player1Score){
-        winnerText = "🏆 " + document.getElementById("guestName").textContent + " g‘olib!";
-        subtitle = "Ajoyib natija! 🎉";
-        hasWinner = true;
-    }else{
-        winnerText = "🤝 Durrang!";
-        subtitle = "Ikkala o‘yinchi ham teng ball oldi.";
-    }
-
-    document.getElementById("winner").textContent = winnerText;
-    document.getElementById("winnerSubtitle").textContent = subtitle;
-    document.getElementById("finalScore").innerHTML =
-        "<h3>" + player1Score + " : " + player2Score + "</h3>";
-
-    document.getElementById("statsGrid").innerHTML =
-        buildStatsHtml(document.getElementById("hostName").textContent || "Player 1", player1Score, player1Stats) +
-        buildStatsHtml(document.getElementById("guestName").textContent || "Player 2", player2Score, player2Stats);
-
-    document.getElementById("resultTrophy").textContent = hasWinner ? "🏆" : "🤝";
-
-    if(hasWinner){
-        launchConfetti();
-    }
-
+function accuracy(p){
+  if(!p || !p.answers) return 0;
+  return Math.round((p.correct/p.answers)*100);
 }
 
+function avgTime(p){
+  if(!p || !p.answers) return "0.0";
+  return (p.answerTime/p.answers).toFixed(1);
+}
+
+function showResult(){
+  document.getElementById("gameScreen").classList.add("hidden");
+  document.getElementById("waitingScreen").classList.add("hidden");
+  document.getElementById("resultScreen").classList.remove("hidden");
+
+  const list=sortedPlayers();
+  if(!list.length) return;
+  const winner=list[0];
+  const topScore=Number(winner.score)||0;
+  const tied=list.filter(function(p){return (Number(p.score)||0)===topScore;});
+  const draw=list.length>1 && tied.length>1;
+
+  document.getElementById("resultTrophy").textContent=draw?'🤝':'🏆';
+  document.getElementById("winner").textContent=draw?'🤝 Durrang!':'🏆 '+winner.name+' g‘olib!';
+  document.getElementById("winnerSubtitle").textContent=draw?'Bir nechta o‘yinchi teng ball oldi.':'Ajoyib natija! 🎉';
+  document.getElementById("finalScore").textContent=list.map(function(p){return p.name+': '+p.score;}).slice(0,4).join('  •  ');
+
+  document.getElementById("finalTable").innerHTML=list.map(function(p,i){
+    return '<div class="final-player '+(i===0?'first':'')+'">' +
+      '<div class="final-head"><div class="final-name">'+(i===0?'🥇 ':'#'+(i+1)+' ')+escapeHtml(p.name)+'</div>' +
+      '<div class="final-score-small">'+(p.score||0)+' ball</div></div>' +
+      '<div style="font-size:12px;color:#777;margin-top:5px">✅ '+(p.correct||0)+' • ❌ '+(p.wrong||0)+' • 🎯 '+accuracy(p)+'% • 🔥 x'+(p.maxCombo||0)+' • ⚡ +'+(p.fastBonus||0)+'</div>' +
+      '</div>';
+  }).join("");
+
+  document.getElementById("statsGrid").innerHTML=list.slice(0,4).map(function(p){
+    return '<div class="stats-card"><div class="stats-card-title">'+escapeHtml(p.name)+'</div>' +
+      '<div class="stats-row"><span>✅ To‘g‘ri</span><span class="stats-value">'+(p.correct||0)+'</span></div>' +
+      '<div class="stats-row"><span>❌ Xato/vaqt</span><span class="stats-value">'+(p.wrong||0)+'</span></div>' +
+      '<div class="stats-row"><span>🎯 Aniqlik</span><span class="stats-value">'+accuracy(p)+'%</span></div>' +
+      '<div class="stats-row"><span>🔥 Max combo</span><span class="stats-value">x'+(p.maxCombo||0)+'</span></div>' +
+      '<div class="stats-row"><span>⚡ Tezlik bonusi</span><span class="stats-value">+'+(p.fastBonus||0)+'</span></div>' +
+      '<div class="stats-row"><span>⏱️ O‘rtacha</span><span class="stats-value">'+avgTime(p)+' s</span></div></div>';
+  }).join("");
+
+  if(!draw) launchConfetti();
+}
+
+function launchConfetti(){
+  const symbols=['🎉','✨','🎊','💜','⭐'];
+  for(let i=0;i<35;i++){
+    const piece=document.createElement('div');
+    piece.className='confetti-piece';
+    piece.textContent=symbols[Math.floor(Math.random()*symbols.length)];
+    piece.style.left=(Math.random()*100)+'vw';
+    piece.style.animationDelay=(Math.random()*0.8)+'s';
+    document.body.appendChild(piece);
+    setTimeout(function(){piece.remove();},3600);
+  }
+}
+
+/* ---------- Boot ---------- */
+window.addEventListener("load",function(){
+  initFirebaseLobby();
+});
 </script>
-
 </body>
 </html>
