@@ -182,6 +182,58 @@ button:hover{
     border-color:#e74c3c;
 }
 
+
+.leaderboard{
+    margin:0 0 20px;
+    background:linear-gradient(135deg,#f7f3ff,#eef4ff);
+    border:2px solid #e8defc;
+    border-radius:18px;
+    padding:15px;
+}
+
+.leaderboard-title{
+    text-align:center;
+    font-size:18px;
+    font-weight:900;
+    color:#673de6;
+    margin-bottom:10px;
+}
+
+.leaderboard-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    background:white;
+    border-radius:12px;
+    padding:10px 12px;
+    margin-top:7px;
+    box-shadow:0 3px 10px rgba(80,40,150,.06);
+}
+
+.leaderboard-row.first{
+    border:2px solid #ffd54a;
+}
+
+.leaderboard-rank{
+    font-size:20px;
+    font-weight:900;
+    min-width:32px;
+}
+
+.leaderboard-name{
+    flex:1;
+    font-weight:700;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+
+.leaderboard-score{
+    font-weight:900;
+    color:#673de6;
+}
+
 .hidden{
     display:none;
 }
@@ -291,6 +343,12 @@ button:hover{
             <div id="guestScore" class="score">0</div>
         </div>
 
+    </div>
+
+
+    <div class="leaderboard">
+        <div class="leaderboard-title">🏆 Leaderboard</div>
+        <div id="leaderboardList"></div>
     </div>
 
     <div id="questionNumber" class="question-number">
@@ -652,6 +710,7 @@ function startGame(){
 
     currentQuestion = 0;
 
+    updateScores();
     showQuestion();
 
 }
@@ -844,6 +903,8 @@ function updateScores(){
 
     document.getElementById("guestScore").textContent =
         isHost ? opponentScore : myScore;
+
+    updateLeaderboard();
 
 }
 
