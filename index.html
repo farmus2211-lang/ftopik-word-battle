@@ -1205,7 +1205,12 @@ function showResult(){
       '<div class="stats-row"><span>⚡ Tezlik bonusi</span><span class="stats-value">+'+(p.fastBonus||0)+'</span></div>' +
       '<div class="stats-row"><span>⏱️ O‘rtacha</span><span class="stats-value">'+avgTime(p)+' s</span></div></div>';
   }).join("");
-
+  
+const rematchBtn = document.getElementById("rematchBtn");
+  const rematchInfo = document.getElementById("rematchInfo");
+  rematchBtn.classList.toggle("hidden", !isHost);
+  rematchInfo.classList.toggle("hidden", isHost);
+  
   if(!draw) launchConfetti();
 }
 
