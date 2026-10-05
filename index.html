@@ -182,6 +182,24 @@ button:hover{
     border-color:#e74c3c;
 }
 
+
+.power-hud{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.power-item{background:#f8f5ff;border:1px solid #ece5ff;border-radius:14px;padding:10px 12px;text-align:center}
+.power-label{font-size:12px;color:#777;margin-bottom:4px}
+.power-value{font-size:18px;font-weight:900;color:#673de6}
+.lives{letter-spacing:3px}
+.combo-badge{display:inline-block;min-width:48px;padding:3px 8px;border-radius:999px;background:#efe8ff}
+.timer-text{text-align:center;font-weight:900;color:#673de6;margin:-16px 0 10px}
+.feedback{text-align:center;min-height:28px;font-weight:900;margin:8px 0 0}
+.leaderboard{margin-top:18px;background:#faf9ff;border:1px solid #ece7fb;border-radius:16px;padding:12px}
+.leaderboard-title{text-align:center;font-weight:900;margin-bottom:8px}
+.leaderboard-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;border-radius:10px;margin:5px 0;background:white}
+.leaderboard-row.first{background:#fff9e8}
+.leaderboard-rank{width:34px;font-weight:900}
+.leaderboard-name{flex:1;text-align:left;font-weight:700}
+.leaderboard-score{font-weight:900;color:#673de6}
+@media(max-width:500px){.power-hud{gap:8px}.power-item{padding:9px 8px}.power-value{font-size:16px}}
+
 .hidden{
     display:none;
 }
@@ -293,19 +311,34 @@ button:hover{
 
     </div>
 
+    <div class="power-hud">
+        <div class="power-item"><div class="power-label">Player 1 ❤️ Jon</div><div id="hostLives" class="power-value lives">❤️❤️❤️</div></div>
+        <div class="power-item"><div class="power-label">Player 2 ❤️ Jon</div><div id="guestLives" class="power-value lives">❤️❤️❤️</div></div>
+        <div class="power-item"><div class="power-label">Player 1 🔥 Combo</div><div id="hostCombo" class="power-value"><span class="combo-badge">x0</span></div></div>
+        <div class="power-item"><div class="power-label">Player 2 🔥 Combo</div><div id="guestCombo" class="power-value"><span class="combo-badge">x0</span></div></div>
+    </div>
+
     <div id="questionNumber" class="question-number">
         1 / 10
     </div>
 
+    <div id="timerText" class="timer-text">⏱️ 15 soniya</div>
     <div class="timer">
         <div id="timerBar" class="timer-bar"></div>
     </div>
+
+    <div id="feedback" class="feedback"></div>
 
     <div id="word" class="word">
         학교
     </div>
 
     <div id="answers" class="answers"></div>
+
+    <div class="leaderboard">
+        <div class="leaderboard-title">🏆 Leaderboard</div>
+        <div id="leaderboardList"></div>
+    </div>
 
 </div>
 
@@ -368,10 +401,18 @@ let opponentName = "";
 let myScore = 0;
 let opponentScore = 0;
 
+let myLives = 3;
+let opponentLives = 3;
+let myCombo = 0;
+let opponentCombo = 0;
+let myMaxCombo = 0;
+let opponentMaxCombo = 0;
+
 let currentQuestion = 0;
 let answered = false;
 let hostAnswered = false;
 let guestAnswered = false;
+let questionChanging = false;
 
 let timer = null;
 let timeLeft = 15;
@@ -587,15 +628,17 @@ function handleData(data){
 
     if(data.type === "score"){
 
-    opponentScore = data.score;
+        if(data.question !== currentQuestion) return;
 
-    guestAnswered = true;
-
-    updateScores();
-
-    checkBothAnswered();
-
-}
+        opponentScore = Number(data.score) || 0;
+        opponentLives = typeof data.lives === "number" ? data.lives : opponentLives;
+        opponentCombo = typeof data.combo === "number" ? data.combo : opponentCombo;
+        opponentMaxCombo = typeof data.maxCombo === "number" ? data.maxCombo : opponentMaxCombo;
+        guestAnswered = true;
+        updateScores();
+        showOpponentFeedback(data);
+        checkBothAnswered();
+    }
 
 
     if(data.type === "next"){
@@ -609,11 +652,14 @@ function handleData(data){
 
     if(data.type === "timeout"){
 
-        // Faqat Host timeoutni qabul qiladi.
-        if(isHost && data.question === currentQuestion && !hostAnswered){
-
-            nextQuestion();
-
+        if(isHost && data.question === currentQuestion && !guestAnswered){
+            opponentLives = typeof data.lives === "number" ? data.lives : Math.max(0, opponentLives - 1);
+            opponentCombo = 0;
+            opponentScore = typeof data.score === "number" ? data.score : opponentScore;
+            guestAnswered = true;
+            updateScores();
+            showFeedback("⏰ Raqib vaqtida javob bermadi");
+            checkBothAnswered();
         }
 
     }
@@ -622,7 +668,7 @@ function handleData(data){
     if(data.type === "finish"){
 
         opponentScore = data.opponentScore;
-
+        opponentMaxCombo = typeof data.guestMaxCombo === "number" ? data.guestMaxCombo : opponentMaxCombo;
         showResult(data.hostScore);
 
     }
@@ -671,6 +717,16 @@ function startGame(){
         isHost ? opponentName : myName;
 
     currentQuestion = 0;
+    questionChanging = false;
+    myScore = 0;
+    opponentScore = 0;
+    myLives = 3;
+    opponentLives = 3;
+    myCombo = 0;
+    opponentCombo = 0;
+    myMaxCombo = 0;
+    opponentMaxCombo = 0;
+    updateScores();
 
     showQuestion();
 
@@ -686,8 +742,10 @@ function showQuestion(){
     answered = false;
     hostAnswered = false;
     guestAnswered = false;
+    questionChanging = false;
 
     clearInterval(timer);
+    document.getElementById("feedback").textContent = "";
 
     if(currentQuestion >= questions.length){
         finishGame();
@@ -760,22 +818,31 @@ function showQuestion(){
             clearInterval(timer);
             disableAnswers();
 
-            // Host keyingi savolni o‘zi boshqaradi.
-            if(isHost){
+            if(!answered){
+                answered = true;
+                myLives = Math.max(0, myLives - 1);
+                myCombo = 0;
+                updateScores();
+                showFeedback("⏰ Vaqt tugadi! ❤️ Jon: " + myLives);
 
-                nextQuestion();
-
-            }else{
-
-                // Guest Hostga timeout bo‘lganini bildiradi.
-                if(connection){
-
+                if(isHost){
+                    hostAnswered = true;
+                    if(connection){
+                        connection.send({
+                            type:"score", score:myScore, lives:myLives, combo:myCombo,
+                            maxCombo:myMaxCombo, correct:false, fastBonus:0, question:currentQuestion
+                        });
+                    }
+                    checkBothAnswered();
+                }else if(connection){
                     connection.send({
-                        type:"timeout",
-                        question:currentQuestion
+                        type:"timeout", score:myScore, lives:myLives, question:currentQuestion
                     });
-
                 }
+            }
+
+            if(isHost && !questionChanging){
+                nextQuestion();
             }
         }
 
@@ -792,6 +859,9 @@ function updateTimer(){
     document.getElementById("timerBar").style.width =
         (timeLeft / 15 * 100) + "%";
 
+    document.getElementById("timerText").textContent =
+        "⏱️ " + timeLeft + " soniya";
+
 }
 
 
@@ -801,65 +871,97 @@ function updateTimer(){
 
 function answerQuestion(answer, button){
 
-    if(answered) return;
+    if(answered || myLives <= 0) return;
 
     answered = true;
 
-    const correct =
-        questions[currentQuestion].correct === answer;
+    const correct = questions[currentQuestion].correct === answer;
+    const secondsLeftAtAnswer = timeLeft;
+    let fastBonus = 0;
+    let comboBonus = 0;
+    let totalPoints = 0;
 
     if(correct){
-
         button.classList.add("correct");
-
-        myScore += 10;
-
+        myCombo++;
+        myMaxCombo = Math.max(myMaxCombo, myCombo);
+        fastBonus = getFastBonus(secondsLeftAtAnswer);
+        comboBonus = Math.min((myCombo - 1) * 2, 10);
+        totalPoints = 10 + fastBonus + comboBonus;
+        myScore += totalPoints;
+        showFeedback("✅ To‘g‘ri! +" + totalPoints + " ball" + (fastBonus ? " ⚡+" + fastBonus : "") + (comboBonus ? " 🔥+" + comboBonus : ""));
     }else{
-
         button.classList.add("wrong");
-
-        myScore += 0;
-
+        myLives = Math.max(0, myLives - 1);
+        myCombo = 0;
+        document.querySelectorAll(".answer").forEach(function(btn){
+            if(btn.textContent === questions[currentQuestion].correct){
+                btn.classList.add("correct");
+            }
+        });
+        showFeedback("❌ Noto‘g‘ri! ❤️ Jon: " + myLives);
     }
 
     disableAnswers();
-
     updateScores();
 
-    if(!isHost){
+    const payload = {
+        type:"score",
+        score:myScore,
+        lives:myLives,
+        combo:myCombo,
+        maxCombo:myMaxCombo,
+        correct:correct,
+        fastBonus:fastBonus,
+        question:currentQuestion
+    };
 
-        connection.send({
-            type:"score",
-            score:myScore,
-            question:currentQuestion
-        });
-
-    }
+    if(!isHost && connection) connection.send(payload);
 
     if(isHost){
-
         hostAnswered = true;
-
         checkBothAnswered();
-
     }
+
 }
 
+function getFastBonus(secondsLeft){
+    if(secondsLeft >= 13) return 5;
+    if(secondsLeft >= 10) return 4;
+    if(secondsLeft >= 7) return 3;
+    if(secondsLeft >= 4) return 2;
+    if(secondsLeft >= 1) return 1;
+    return 0;
+}
+
+function showFeedback(message){
+    const el = document.getElementById("feedback");
+    if(el) el.textContent = message || "";
+}
+
+function showOpponentFeedback(data){
+    if(data.correct){
+        let msg = "🔥 Raqib to‘g‘ri javob berdi";
+        if(data.fastBonus) msg += " ⚡+" + data.fastBonus;
+        showFeedback(msg);
+    }else{
+        showFeedback("❌ Raqib xato qildi");
+    }
+}
 
 function checkBothAnswered(){
 
-    if(hostAnswered && guestAnswered){
-
+    if(hostAnswered && guestAnswered && !questionChanging){
         clearInterval(timer);
-
+        const waitingQuestion = currentQuestion;
         setTimeout(function(){
-
-            nextQuestion();
-
+            if(currentQuestion === waitingQuestion && !questionChanging){
+                nextQuestion();
+            }
         },500);
-
     }
 }
+
 /* =========================
    DISABLE ANSWERS
 ========================= */
@@ -887,6 +989,57 @@ function updateScores(){
     document.getElementById("guestScore").textContent =
         isHost ? opponentScore : myScore;
 
+    updatePowerHud();
+    updateLeaderboard();
+
+}
+
+function updatePowerHud(){
+
+    const hostLives = isHost ? myLives : opponentLives;
+    const guestLives = isHost ? opponentLives : myLives;
+    const hostCombo = isHost ? myCombo : opponentCombo;
+    const guestCombo = isHost ? opponentCombo : myCombo;
+
+    const hostLivesEl = document.getElementById("hostLives");
+    const guestLivesEl = document.getElementById("guestLives");
+    const hostComboEl = document.getElementById("hostCombo");
+    const guestComboEl = document.getElementById("guestCombo");
+
+    if(hostLivesEl) hostLivesEl.textContent = "❤️".repeat(hostLives) + "🖤".repeat(3 - hostLives);
+    if(guestLivesEl) guestLivesEl.textContent = "❤️".repeat(guestLives) + "🖤".repeat(3 - guestLives);
+    if(hostComboEl) hostComboEl.innerHTML = '<span class="combo-badge">x' + hostCombo + '</span>';
+    if(guestComboEl) guestComboEl.innerHTML = '<span class="combo-badge">x' + guestCombo + '</span>';
+
+}
+
+function updateLeaderboard(){
+
+    const list = document.getElementById("leaderboardList");
+    if(!list) return;
+
+    const players = [
+        { name: document.getElementById("hostName").textContent || "Player 1", score: isHost ? myScore : opponentScore },
+        { name: document.getElementById("guestName").textContent || "Player 2", score: isHost ? opponentScore : myScore }
+    ].sort((a,b) => b.score - a.score);
+
+    const medals = ["🥇","🥈"];
+    list.innerHTML = players.map(function(player,index){
+        return '<div class="leaderboard-row ' + (index === 0 ? 'first' : '') + '">' +
+               '<div class="leaderboard-rank">' + medals[index] + '</div>' +
+               '<div class="leaderboard-name">' + escapeHtml(player.name) + '</div>' +
+               '<div class="leaderboard-score">' + player.score + '</div>' +
+               '</div>';
+    }).join("");
+
+}
+
+function escapeHtml(value){
+    return String(value).replace(/[&<>\"']/g, function(ch){
+        return ({
+            '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+        })[ch];
+    });
 }
 
 
@@ -896,34 +1049,29 @@ function updateScores(){
 
 function nextQuestion(){
 
+    if(questionChanging) return;
+    questionChanging = true;
     clearInterval(timer);
+
+    if(myLives <= 0 || opponentLives <= 0){
+        finishGame();
+        return;
+    }
 
     currentQuestion++;
 
     if(currentQuestion >= questions.length){
-
         finishGame();
-
         return;
-
     }
 
     if(isHost && connection){
-
-        connection.send({
-
-            type:"next",
-
-            question:currentQuestion
-
-        });
-
+        connection.send({type:"next", question:currentQuestion});
     }
 
     showQuestion();
 
 }
-
 
 /* =========================
    FINISH
@@ -936,13 +1084,11 @@ function finishGame(){
     if(isHost){
 
         connection.send({
-
             type:"finish",
-
             hostScore:myScore,
-
-            opponentScore:opponentScore
-
+            opponentScore:opponentScore,
+            hostMaxCombo:myMaxCombo,
+            guestMaxCombo:opponentMaxCombo
         });
 
     }
