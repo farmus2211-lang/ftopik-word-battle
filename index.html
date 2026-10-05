@@ -202,8 +202,10 @@ button:disabled{opacity:.55;cursor:not-allowed}
    PeerJS = real-time game traffic
    Firebase RTDB = public room list only
 ========================================================= */
+const BUILD = "20261006-0322-stable";
 const MAX_PLAYERS = 10;
 const GAME_TIME = 15;
+console.log("F-TOPIK WORD BATTLE", BUILD);
 
 let peer = null;
 let hostConnection = null;
@@ -221,6 +223,9 @@ let currentQuestion = 0;
 let answered = false;
 let questionChanging = false;
 let timer = null;
+let questionTimeout = null;
+let questionStartedAt = 0;
+let nextSyncWatchdog = null;
 let timeLeft = GAME_TIME;
 let lobbyRoomRef = null;
 let lobbyAvailable = false;
@@ -508,6 +513,7 @@ function checkAllAnswered(){
   const active = activePlayers();
   if(active.length < 2) return false;
   if(active.every(function(p){ return p.answered; })){
+    // Both/all players answered this question. Advance immediately.
     nextQuestion();
     return true;
   }
@@ -783,6 +789,7 @@ function handleData(data,conn){
   }
 
   if(data.type === "next" && !isHost){
+    if(nextSyncWatchdog){ clearTimeout(nextSyncWatchdog); nextSyncWatchdog=null; }
     currentQuestion = Number(data.question) || 0;
     answered = false;
     questionChanging = false;
@@ -790,7 +797,19 @@ function handleData(data,conn){
     return;
   }
 
+  if(data.type === "syncRequest" && isHost){
+    // Guest asks for the latest question if the next-message was missed.
+    if(data.question !== currentQuestion){
+      sendToGuest(conn.peer,{type:"next",question:currentQuestion});
+    }else{
+      sendToGuest(conn.peer,{type:"players",players:serializePlayers()});
+      checkAllAnswered();
+    }
+    return;
+  }
+
   if(data.type === "finish"){
+    if(nextSyncWatchdog){ clearTimeout(nextSyncWatchdog); nextSyncWatchdog=null; }
     gameStarted = false;
     applyPlayers(data.players || {});
     showResult();
@@ -887,6 +906,8 @@ function showGameScreen(){
 /* ---------- Question / timer ---------- */
 function showQuestion(){
   clearInterval(timer);
+  if(questionTimeout){ clearTimeout(questionTimeout); questionTimeout=null; }
+
   answered = false;
   resetQuestionFlags();
   document.getElementById("feedback").textContent = "";
@@ -922,35 +943,49 @@ function showQuestion(){
     answersBox.appendChild(btn);
   });
 
+  questionStartedAt = Date.now();
   timeLeft = GAME_TIME;
   updateTimer();
+
+  // Host owns the real question deadline. It continues even after the host answers,
+  // so the game can never get stuck waiting for a player.
+  if(isHost){
+    questionTimeout = setTimeout(function(){
+      finishCurrentQuestionByTimeout();
+    }, GAME_TIME * 1000 + 150);
+  }
+
   timer = setInterval(function(){
-    timeLeft--;
+    const elapsed = Math.floor((Date.now() - questionStartedAt) / 1000);
+    timeLeft = Math.max(0, GAME_TIME - elapsed);
     updateTimer();
+
     if(timeLeft <= 0){
       clearInterval(timer);
-      disableAnswers();
-
-      // Host timer is authoritative. Guests only stop showing answer buttons;
-      // the host decides when the question ends for everyone.
-      if(isHost){
-        if(!answered){
-          answered = true;
-          recordAnswer(myPlayerId,false,0);
-          showFeedback("⏰ Vaqt tugadi! Keyingi savolga o‘tilmoqda...");
-        }
-
-        activePlayers().forEach(function(p){
-          if(!p.answered) recordAnswer(p.id,false,0);
-        });
-
-        broadcastScores();
-        nextQuestion();
-      }else if(!answered){
-        showFeedback("⏰ Vaqt tugadi. Raqibingiz keyingi savolni kutmoqda...");
+      if(!isHost && !answered){
+        // Guest reports timeout to the host; host remains authoritative.
+        answerQuestion(null,null,true);
       }
     }
-  },1000);
+  },250);
+}
+
+function finishCurrentQuestionByTimeout(){
+  if(!isHost || !gameStarted || questionChanging) return;
+
+  clearInterval(timer);
+  if(questionTimeout){ clearTimeout(questionTimeout); questionTimeout=null; }
+  timeLeft = 0;
+  updateTimer();
+  disableAnswers();
+
+  activePlayers().forEach(function(p){
+    if(!p.answered) recordAnswer(p.id,false,0);
+  });
+
+  broadcastScores();
+  showFeedback("⏰ Vaqt tugadi! Keyingi savolga o‘tilmoqda...");
+  nextQuestion();
 }
 
 function updateTimer(){
@@ -987,7 +1022,8 @@ function recordAnswer(id,correct,secondsLeft){
 function answerQuestion(answer,button,isTimeout){
   if(answered) return;
   answered = true;
-  clearInterval(timer);
+  // The timer display keeps running after an answer, so the screen never appears
+  // frozen. The buttons are disabled, and the host remains authoritative for advancing.
   disableAnswers();
 
   const p = me();
@@ -1035,6 +1071,17 @@ function answerQuestion(answer,button,isTimeout){
       timeout:!!isTimeout,
       secondsLeft:secondsLeftAtAnswer
     });
+
+    // Safety net: if the host advanced but the "next" packet was lost, ask for the
+    // current state. This runs only once per answered question.
+    const waitingQuestion = currentQuestion;
+    if(nextSyncWatchdog) clearTimeout(nextSyncWatchdog);
+    nextSyncWatchdog = setTimeout(function(){
+      nextSyncWatchdog=null;
+      if(!isHost && gameStarted && currentQuestion === waitingQuestion && answered && hostConnection && hostConnection.open){
+        hostConnection.send({type:"syncRequest",question:waitingQuestion});
+      }
+    },2200);
   }
 }
 
@@ -1043,6 +1090,7 @@ function nextQuestion(){
 
   questionChanging = true;
   clearInterval(timer);
+  if(questionTimeout){ clearTimeout(questionTimeout); questionTimeout=null; }
 
   currentQuestion++;
   if(currentQuestion >= questions.length){
