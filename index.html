@@ -6,7 +6,7 @@
 <title>F-TOPIK WORD BATTLE</title>
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="questions.js?v=20261005"></script>
+<script src="questions.js?v=20261006"></script>
 <style>
 *{
     box-sizing:border-box;
@@ -57,6 +57,29 @@ input{
 }
 
 input:focus{
+    border-color:#7546e8;
+}
+
+.mode-label{
+    display:block;
+    font-size:14px;
+    font-weight:800;
+    color:#666;
+    margin:2px 0 7px;
+}
+
+.mode-select{
+    width:100%;
+    padding:15px;
+    border:2px solid #ddd;
+    border-radius:12px;
+    font-size:16px;
+    margin-bottom:12px;
+    outline:none;
+    background:white;
+}
+
+.mode-select:focus{
     border-color:#7546e8;
 }
 
@@ -187,7 +210,6 @@ button:hover{
 .power-item{background:#f8f5ff;border:1px solid #ece5ff;border-radius:14px;padding:10px 12px;text-align:center}
 .power-label{font-size:12px;color:#777;margin-bottom:4px}
 .power-value{font-size:18px;font-weight:900;color:#673de6}
-.lives{letter-spacing:3px}
 .combo-badge{display:inline-block;min-width:48px;padding:3px 8px;border-radius:999px;background:#efe8ff}
 .timer-text{text-align:center;font-weight:900;color:#673de6;margin:-16px 0 10px}
 .feedback{text-align:center;min-height:28px;font-weight:900;margin:8px 0 0}
@@ -247,7 +269,7 @@ button:hover{
 <div class="container">
 
 <div class="logo">🇰🇷 F-TOPIK WORD BATTLE</div>
-<div class="subtitle">1 vs 1 Korean Vocabulary Game</div>
+<div class="subtitle">1 vs 1 Korean Vocabulary Game • 10 / 20 / 30 savol</div>
 
 
 <!-- START -->
@@ -256,6 +278,13 @@ button:hover{
     <h2>🎮 O‘yinni boshlash</h2>
 
     <input id="nameInput" placeholder="Ismingizni kiriting">
+
+    <label class="mode-label" for="questionMode">🎯 Savollar soni</label>
+    <select id="questionMode" class="mode-select">
+        <option value="10">10 ta savol</option>
+        <option value="20">20 ta savol</option>
+        <option value="30">30 ta savol</option>
+    </select>
 
     <button onclick="createRoom()">
         🏠 Xona yaratish
@@ -312,9 +341,7 @@ button:hover{
     </div>
 
     <div class="power-hud">
-        <div class="power-item"><div class="power-label">Player 1 ❤️ Jon</div><div id="hostLives" class="power-value lives">❤️❤️❤️</div></div>
-        <div class="power-item"><div class="power-label">Player 2 ❤️ Jon</div><div id="guestLives" class="power-value lives">❤️❤️❤️</div></div>
-        <div class="power-item"><div class="power-label">Player 1 🔥 Combo</div><div id="hostCombo" class="power-value"><span class="combo-badge">x0</span></div></div>
+                <div class="power-item"><div class="power-label">Player 1 🔥 Combo</div><div id="hostCombo" class="power-value"><span class="combo-badge">x0</span></div></div>
         <div class="power-item"><div class="power-label">Player 2 🔥 Combo</div><div id="guestCombo" class="power-value"><span class="combo-badge">x0</span></div></div>
     </div>
 
@@ -365,30 +392,37 @@ button:hover{
 
 <script>
 
-const shuffledWordBank = [...wordBank]
-    .sort(() => Math.random() - 0.5)
-    .slice(0, 10);
+let questionCount = 10;
 
-let questions = shuffledWordBank.map(item => {
+function generateQuestions(count){
 
-    const wrongAnswers = wordBank
-        .filter(x => x.uzbek !== item.uzbek)
+    const shuffledWordBank = [...wordBank]
         .sort(() => Math.random() - 0.5)
-        .slice(0, 3)
-        .map(x => x.uzbek);
+        .slice(0, count);
 
-    const answers = [
-        item.uzbek,
-        ...wrongAnswers
-    ].sort(() => Math.random() - 0.5);
+    return shuffledWordBank.map(item => {
 
-    return {
-        word: item.korean,
-        answers: answers,
-        correct: item.uzbek
-    };
+        const wrongAnswers = wordBank
+            .filter(x => x.uzbek !== item.uzbek)
+            .sort(() => Math.random() - 0.5)
+            .slice(0, 3)
+            .map(x => x.uzbek);
 
-});
+        const answers = [
+            item.uzbek,
+            ...wrongAnswers
+        ].sort(() => Math.random() - 0.5);
+
+        return {
+            word: item.korean,
+            answers: answers,
+            correct: item.uzbek
+        };
+
+    });
+}
+
+let questions = generateQuestions(10);
 
 let peer = null;
 let connection = null;
@@ -401,8 +435,6 @@ let opponentName = "";
 let myScore = 0;
 let opponentScore = 0;
 
-let myLives = 3;
-let opponentLives = 3;
 let myCombo = 0;
 let opponentCombo = 0;
 let myMaxCombo = 0;
@@ -445,6 +477,9 @@ function generateCode(){
 function createRoom(){
 
     myName = document.getElementById("nameInput").value.trim();
+    questionCount = Number(document.getElementById("questionMode").value) || 10;
+
+    questions = generateQuestions(questionCount);
 
     if(!myName){
         alert("Avval ismingizni kiriting!");
@@ -618,10 +653,9 @@ function handleData(data){
     if(data.type === "start"){
 
         opponentName = data.hostName;
-
-    questions = data.questions;
-
-    startGame();
+        questions = Array.isArray(data.questions) ? data.questions : [];
+        questionCount = Number(data.questionCount) || questions.length || 10;
+        startGame();
 
     }
 
@@ -631,7 +665,6 @@ function handleData(data){
         if(data.question !== currentQuestion) return;
 
         opponentScore = Number(data.score) || 0;
-        opponentLives = typeof data.lives === "number" ? data.lives : opponentLives;
         opponentCombo = typeof data.combo === "number" ? data.combo : opponentCombo;
         opponentMaxCombo = typeof data.maxCombo === "number" ? data.maxCombo : opponentMaxCombo;
         guestAnswered = true;
@@ -653,9 +686,9 @@ function handleData(data){
     if(data.type === "timeout"){
 
         if(isHost && data.question === currentQuestion && !guestAnswered){
-            opponentLives = typeof data.lives === "number" ? data.lives : Math.max(0, opponentLives - 1);
             opponentCombo = 0;
             opponentScore = typeof data.score === "number" ? data.score : opponentScore;
+            opponentMaxCombo = typeof data.maxCombo === "number" ? data.maxCombo : opponentMaxCombo;
             guestAnswered = true;
             updateScores();
             showFeedback("⏰ Raqib vaqtida javob bermadi");
@@ -704,6 +737,8 @@ function startGame(){
 
             hostName:myName,
 
+            questionCount:questionCount,
+
             questions:questions
 
         });
@@ -720,8 +755,6 @@ function startGame(){
     questionChanging = false;
     myScore = 0;
     opponentScore = 0;
-    myLives = 3;
-    opponentLives = 3;
     myCombo = 0;
     opponentCombo = 0;
     myMaxCombo = 0;
@@ -820,23 +853,22 @@ function showQuestion(){
 
             if(!answered){
                 answered = true;
-                myLives = Math.max(0, myLives - 1);
                 myCombo = 0;
                 updateScores();
-                showFeedback("⏰ Vaqt tugadi! ❤️ Jon: " + myLives);
+                showFeedback("⏰ Vaqt tugadi!");
 
                 if(isHost){
                     hostAnswered = true;
                     if(connection){
                         connection.send({
-                            type:"score", score:myScore, lives:myLives, combo:myCombo,
+                            type:"score", score:myScore, combo:myCombo,
                             maxCombo:myMaxCombo, correct:false, fastBonus:0, question:currentQuestion
                         });
                     }
-                    checkBothAnswered();
                 }else if(connection){
                     connection.send({
-                        type:"timeout", score:myScore, lives:myLives, question:currentQuestion
+                        type:"timeout", score:myScore, combo:myCombo,
+                        maxCombo:myMaxCombo, question:currentQuestion
                     });
                 }
             }
@@ -871,9 +903,13 @@ function updateTimer(){
 
 function answerQuestion(answer, button){
 
-    if(answered || myLives <= 0) return;
+    if(answered) return;
 
     answered = true;
+
+    if(!isHost){
+        clearInterval(timer);
+    }
 
     const correct = questions[currentQuestion].correct === answer;
     const secondsLeftAtAnswer = timeLeft;
@@ -892,14 +928,13 @@ function answerQuestion(answer, button){
         showFeedback("✅ To‘g‘ri! +" + totalPoints + " ball" + (fastBonus ? " ⚡+" + fastBonus : "") + (comboBonus ? " 🔥+" + comboBonus : ""));
     }else{
         button.classList.add("wrong");
-        myLives = Math.max(0, myLives - 1);
         myCombo = 0;
         document.querySelectorAll(".answer").forEach(function(btn){
             if(btn.textContent === questions[currentQuestion].correct){
                 btn.classList.add("correct");
             }
         });
-        showFeedback("❌ Noto‘g‘ri! ❤️ Jon: " + myLives);
+        showFeedback("❌ Noto‘g‘ri!");
     }
 
     disableAnswers();
@@ -908,7 +943,6 @@ function answerQuestion(answer, button){
     const payload = {
         type:"score",
         score:myScore,
-        lives:myLives,
         combo:myCombo,
         maxCombo:myMaxCombo,
         correct:correct,
@@ -996,18 +1030,12 @@ function updateScores(){
 
 function updatePowerHud(){
 
-    const hostLives = isHost ? myLives : opponentLives;
-    const guestLives = isHost ? opponentLives : myLives;
     const hostCombo = isHost ? myCombo : opponentCombo;
     const guestCombo = isHost ? opponentCombo : myCombo;
 
-    const hostLivesEl = document.getElementById("hostLives");
-    const guestLivesEl = document.getElementById("guestLives");
     const hostComboEl = document.getElementById("hostCombo");
     const guestComboEl = document.getElementById("guestCombo");
 
-    if(hostLivesEl) hostLivesEl.textContent = "❤️".repeat(hostLives) + "🖤".repeat(3 - hostLives);
-    if(guestLivesEl) guestLivesEl.textContent = "❤️".repeat(guestLives) + "🖤".repeat(3 - guestLives);
     if(hostComboEl) hostComboEl.innerHTML = '<span class="combo-badge">x' + hostCombo + '</span>';
     if(guestComboEl) guestComboEl.innerHTML = '<span class="combo-badge">x' + guestCombo + '</span>';
 
@@ -1052,11 +1080,6 @@ function nextQuestion(){
     if(questionChanging) return;
     questionChanging = true;
     clearInterval(timer);
-
-    if(myLives <= 0 || opponentLives <= 0){
-        finishGame();
-        return;
-    }
 
     currentQuestion++;
 
