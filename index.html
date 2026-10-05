@@ -190,7 +190,6 @@ button:hover{
     border-radius:18px;
     padding:15px;
 }
-
 .leaderboard-title{
     text-align:center;
     font-size:18px;
@@ -198,7 +197,6 @@ button:hover{
     color:#673de6;
     margin-bottom:10px;
 }
-
 .leaderboard-row{
     display:flex;
     align-items:center;
@@ -210,29 +208,10 @@ button:hover{
     margin-top:7px;
     box-shadow:0 3px 10px rgba(80,40,150,.06);
 }
-
-.leaderboard-row.first{
-    border:2px solid #ffd54a;
-}
-
-.leaderboard-rank{
-    font-size:20px;
-    font-weight:900;
-    min-width:32px;
-}
-
-.leaderboard-name{
-    flex:1;
-    font-weight:700;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    white-space:nowrap;
-}
-
-.leaderboard-score{
-    font-weight:900;
-    color:#673de6;
-}
+.leaderboard-row.first{border:2px solid #ffd54a;}
+.leaderboard-rank{font-size:20px;font-weight:900;min-width:32px;}
+.leaderboard-name{flex:1;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.leaderboard-score{font-weight:900;color:#673de6;}
 
 .hidden{
     display:none;
@@ -344,7 +323,6 @@ button:hover{
         </div>
 
     </div>
-
 
     <div class="leaderboard">
         <div class="leaderboard-title">🏆 Leaderboard</div>
@@ -789,7 +767,7 @@ shuffledAnswers.forEach(answer => {
 
             if(isHost){
 
-                setTimeout(nextQuestion,1000);
+                nextQuestion();
 
             }
 
@@ -912,6 +890,52 @@ function updateScores(){
 /* =========================
    NEXT QUESTION
 ========================= */
+
+
+/* =========================
+   LEADERBOARD
+   ========================= */
+
+function updateLeaderboard(){
+
+    const list = document.getElementById("leaderboardList");
+
+    if(!list) return;
+
+    const players = [
+        {
+            name: isHost ? myName : opponentName,
+            score: isHost ? myScore : opponentScore
+        },
+        {
+            name: isHost ? opponentName : myName,
+            score: isHost ? opponentScore : myScore
+        }
+    ];
+
+    players.sort((a,b) => b.score - a.score);
+
+    list.innerHTML = "";
+
+    players.forEach((player,index) => {
+
+        const row = document.createElement("div");
+
+        row.className =
+            "leaderboard-row" +
+            (index === 0 ? " first" : "");
+
+        const medals = ["🥇","🥈","🥉"];
+        const rank = medals[index] || ((index + 1) + ".");
+
+        row.innerHTML =
+            '<div class="leaderboard-rank">' + rank + '</div>' +
+            '<div class="leaderboard-name">' + player.name + '</div>' +
+            '<div class="leaderboard-score">' + player.score + ' ball</div>';
+
+        list.appendChild(row);
+    });
+}
 
 function nextQuestion(){
 
