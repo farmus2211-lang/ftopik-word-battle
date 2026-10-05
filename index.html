@@ -867,6 +867,23 @@ function copyRoomCode(){
   }
 }
 
+function rematch(){
+  if(!isHost) return;
+
+  // chiqib ketgan o'yinchilarni olib tashlaymiz
+  Object.keys(players).forEach(function(id){
+    if(players[id].connected === false) delete players[id];
+  });
+
+  if(activePlayers().length < 2){
+    alert("Qayta o‘ynash uchun kamida 2 ta o‘yinchi kerak.");
+    return;
+  }
+
+  startRequested = false;
+  startMultiplayerGame();
+}
+  
 /* ---------- Start game ---------- */
 function startMultiplayerGame(){
   if(!isHost || startRequested) return;
@@ -906,6 +923,7 @@ function startMultiplayerGame(){
 
 function showGameScreen(){
   document.getElementById("waitingScreen").classList.add("hidden");
+  document.getElementById("resultScreen").classList.add("hidden");
   document.getElementById("gameScreen").classList.remove("hidden");
 }
 
