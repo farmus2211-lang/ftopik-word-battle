@@ -534,6 +534,10 @@ function escapeHtml(value){
     return ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"})[ch];
   });
 }
+  function showFeedback(message){
+  const el = document.getElementById("feedback");
+  if(el) el.textContent = message;
+}
 
 /* ---------- Room creation/join ---------- */
 function createRoom(){
