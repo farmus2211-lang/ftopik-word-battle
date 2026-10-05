@@ -191,7 +191,9 @@ button:disabled{opacity:.55;cursor:not-allowed}
   <div id="finalScore" class="final-score"></div>
   <div id="finalTable" class="final-table"></div>
   <div id="statsGrid" class="stats-grid"></div>
-  <button onclick="location.reload()">🔄 Yana o‘ynash</button>
+  <button id="rematchBtn" class="hidden" onclick="rematch()">🔁 Shu o‘yinchilar bilan qayta o‘ynash</button>
+<div id="rematchInfo" class="small hidden">⏳ Host o‘yinni qayta boshlashini kuting...</div>
+<button class="secondary" onclick="location.reload()">🚪 Chiqish</button>
 </div>
 
 </div>
