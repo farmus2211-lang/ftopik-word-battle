@@ -705,6 +705,41 @@ function handleData(data,conn){
     return;
   }
 
+  /* Guest javobini hostning o‘zi hisoblaydi. Shunda ikkala qurilmada ham
+     bir xil savol/javob tekshiriladi va guest balli yo‘qolib qolmaydi. */
+  if(data.type === "answer" && isHost){
+    const id = conn.peer;
+    if(!gameStarted || Number(data.question) !== currentQuestion || !players[id] || players[id].answered) return;
+
+    const p = players[id];
+    const selected = data.answer === null || data.answer === undefined ? null : String(data.answer);
+    const correct = !data.timeout && selected !== null && questions[currentQuestion] && questions[currentQuestion].correct === selected;
+    const secondsLeft = Math.max(0, Math.min(GAME_TIME, Number(data.secondsLeft) || 0));
+
+    recordAnswer(id, correct, secondsLeft);
+    broadcastScores();
+
+    sendToGuest(id,{
+      type:"answerResult",
+      question:currentQuestion,
+      correct:correct,
+      timeout:!!data.timeout,
+      score:p.score,
+      combo:p.combo,
+      maxCombo:p.maxCombo,
+      correctTotal:p.correct,
+      wrongTotal:p.wrong,
+      fastBonusTotal:p.fastBonus,
+      answerTimeTotal:p.answerTime,
+      answersTotal:p.answers
+    });
+
+    showFeedback(correct ? ("🔥 " + p.name + " to‘g‘ri javob berdi") : (data.timeout ? ("⏰ " + p.name + " uchun vaqt tugadi") : ("❌ " + p.name + " xato qildi")));
+    checkAllAnswered();
+    return;
+  }
+
+  /* Eski versiya bilan ulanish qolsa ham ishlashi uchun score xabarini qabul qilamiz. */
   if(data.type === "score" && isHost){
     const id = conn.peer;
     if(!gameStarted || data.question !== currentQuestion || !players[id] || players[id].answered) return;
@@ -721,6 +756,25 @@ function handleData(data,conn){
     broadcastScores();
     showFeedback(data.correct ? ("🔥 " + p.name + " to‘g‘ri javob berdi") : ("❌ " + p.name + " xato qildi"));
     checkAllAnswered();
+    return;
+  }
+
+  if(data.type === "answerResult" && !isHost){
+    if(Number(data.question) !== currentQuestion) return;
+    const p = me();
+    if(p){
+      p.score = Number(data.score) || 0;
+      p.combo = Number(data.combo) || 0;
+      p.maxCombo = Math.max(Number(p.maxCombo)||0, Number(data.maxCombo)||0);
+      p.correct = Number(data.correctTotal) || 0;
+      p.wrong = Number(data.wrongTotal) || 0;
+      p.fastBonus = Number(data.fastBonusTotal) || 0;
+      p.answerTime = Number(data.answerTimeTotal) || 0;
+      p.answers = Number(data.answersTotal) || 0;
+      p.answered = true;
+      renderPlayersBoard();
+      document.getElementById("myBadge").textContent = "Siz • " + p.score + " ball";
+    }
     return;
   }
 
@@ -760,7 +814,7 @@ function showGuestWaitingScreen(){
   document.getElementById("waitingScreen").classList.remove("hidden");
   document.getElementById("roomCode").textContent = roomCode || "------";
   document.getElementById("startGameBtn").classList.add("hidden");
-  document.getElementById("connectionStatus").textContent = "✅ Xonaga kirdingiz. O‘qituvchi o‘yinni boshlashini kuting...";
+  document.getElementById("connectionStatus").textContent = "✅ Xonaga kirdingiz. Raqibingiz o‘yinni boshlashini kuting...";
   renderWaitingPlayers();
 }
 
@@ -835,7 +889,6 @@ function showGameScreen(){
 function showQuestion(){
   clearInterval(timer);
   answered = false;
-  questionChanging = false;
   resetQuestionFlags();
   document.getElementById("feedback").textContent = "";
 
@@ -883,14 +936,12 @@ function showQuestion(){
           recordAnswer(myPlayerId,false,0);
           broadcastScores();
           showFeedback("⏰ Vaqt tugadi!");
-          const myP = me();
-          if(myP) myP.answered = true;
           checkAllAnswered();
+          nextQuestionIfNeeded();
         }else{
           answerQuestion(null,null,true);
         }
       }
-      if(isHost && !questionChanging) nextQuestionIfNeeded();
     }
   },1000);
 }
@@ -929,49 +980,53 @@ function recordAnswer(id,correct,secondsLeft){
 function answerQuestion(answer,button,isTimeout){
   if(answered) return;
   answered = true;
+  clearInterval(timer);
+  disableAnswers();
 
   const p = me();
   if(!p) return;
-  const correct = !isTimeout && answer !== null && questions[currentQuestion].correct === answer;
+  const current = questions[currentQuestion];
+  const correct = !isTimeout && answer !== null && current && current.correct === answer;
   const secondsLeftAtAnswer = isTimeout ? 0 : timeLeft;
-  recordAnswer(myPlayerId,correct,secondsLeftAtAnswer);
 
   if(correct){
     if(button) button.classList.add("correct");
     const fast=getFastBonus(secondsLeftAtAnswer);
-    const comboBonus=Math.min((p.combo-1)*2,10);
+    const comboBonus=Math.min((p.combo)*2,10);
     const gained=10+fast+comboBonus;
     showFeedback("✅ To‘g‘ri! +" + gained + " ball" + (fast ? " ⚡+"+fast : "") + (comboBonus ? " 🔥+"+comboBonus : ""));
   }else if(isTimeout){
     showFeedback("⏰ Vaqt tugadi!");
   }else{
     document.querySelectorAll(".answer").forEach(function(btn){
-      if(btn.textContent === questions[currentQuestion].correct) btn.classList.add("correct");
+      if(current && btn.textContent === current.correct) btn.classList.add("correct");
     });
     if(button) button.classList.add("wrong");
     showFeedback("❌ Noto‘g‘ri!");
   }
 
-  disableAnswers();
-  renderPlayersBoard();
-  document.getElementById("myBadge").textContent = "Siz • " + p.score + " ball";
-
   if(isHost){
+    recordAnswer(myPlayerId,correct,secondsLeftAtAnswer);
+    const hostP = me();
+    if(hostP){
+      renderPlayersBoard();
+      document.getElementById("myBadge").textContent = "Siz • " + hostP.score + " ball";
+    }
     broadcastScores();
     checkAllAnswered();
-  }else if(hostConnection && hostConnection.open){
+    return;
+  }
+
+  /* Guestda ballni lokal hisoblab yubormaymiz. Host savolning to‘g‘ri javobini
+     tekshiradi va tasdiqlangan natijani answerResult bilan qaytaradi. */
+  showFeedback(isTimeout ? "⏰ Vaqt tugadi. Raqibingizning javobini kuting..." : "✅ Javobingiz qabul qilindi. Raqibingizning javobini kuting...");
+  if(hostConnection && hostConnection.open){
     hostConnection.send({
-      type:"score",
+      type:"answer",
       question:currentQuestion,
-      correct:correct,
-      score:p.score,
-      combo:p.combo,
-      maxCombo:p.maxCombo,
-      correctTotal:p.correct,
-      wrongTotal:p.wrong,
-      fastBonusTotal:p.fastBonus,
-      answerTimeTotal:p.answerTime,
-      answersTotal:p.answers
+      answer:isTimeout ? null : answer,
+      timeout:!!isTimeout,
+      secondsLeft:secondsLeftAtAnswer
     });
   }
 }
@@ -1002,6 +1057,7 @@ function nextQuestion(){
   resetQuestionFlags();
   broadcast({type:"next",question:currentQuestion});
   showQuestion();
+  questionChanging=false;
 }
 
 /* ---------- Board ---------- */
