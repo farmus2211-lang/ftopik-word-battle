@@ -504,15 +504,14 @@ function resetQuestionFlags(){
 }
 
 function checkAllAnswered(){
-  if(!isHost || questionChanging || !gameStarted) return;
+  if(!isHost || questionChanging || !gameStarted) return false;
   const active = activePlayers();
-  if(active.length < 2) return;
-  if(active.every(function(p){return p.answered;})){
-    const q = currentQuestion;
-    setTimeout(function(){
-      if(isHost && currentQuestion === q && !questionChanging) nextQuestion();
-    },350);
+  if(active.length < 2) return false;
+  if(active.every(function(p){ return p.answered; })){
+    nextQuestion();
+    return true;
   }
+  return false;
 }
 
 function getFastBonus(secondsLeft){
@@ -931,16 +930,24 @@ function showQuestion(){
     if(timeLeft <= 0){
       clearInterval(timer);
       disableAnswers();
-      if(!answered){
-        if(isHost){
+
+      // Host timer is authoritative. Guests only stop showing answer buttons;
+      // the host decides when the question ends for everyone.
+      if(isHost){
+        if(!answered){
+          answered = true;
           recordAnswer(myPlayerId,false,0);
-          broadcastScores();
-          showFeedback("⏰ Vaqt tugadi!");
-          checkAllAnswered();
-          nextQuestionIfNeeded();
-        }else{
-          answerQuestion(null,null,true);
+          showFeedback("⏰ Vaqt tugadi! Keyingi savolga o‘tilmoqda...");
         }
+
+        activePlayers().forEach(function(p){
+          if(!p.answered) recordAnswer(p.id,false,0);
+        });
+
+        broadcastScores();
+        nextQuestion();
+      }else if(!answered){
+        showFeedback("⏰ Vaqt tugadi. Raqibingiz keyingi savolni kutmoqda...");
       }
     }
   },1000);
@@ -1031,33 +1038,26 @@ function answerQuestion(answer,button,isTimeout){
   }
 }
 
-function nextQuestionIfNeeded(){
-  const active=activePlayers();
-  if(active.length>=2 && active.every(function(p){return p.answered;})){
-    nextQuestion();
-  }else{
-    // Host timer is authoritative: everyone who has not answered gets a miss.
-    active.forEach(function(p){
-      if(!p.answered) recordAnswer(p.id,false,0);
-    });
-    broadcastScores();
-    nextQuestion();
-  }
-}
-
 function nextQuestion(){
   if(!isHost || questionChanging || !gameStarted) return;
-  questionChanging=true;
+
+  questionChanging = true;
   clearInterval(timer);
+
   currentQuestion++;
-  if(currentQuestion>=questions.length){
+  if(currentQuestion >= questions.length){
     finishGame();
+    questionChanging = false;
     return;
   }
+
   resetQuestionFlags();
+  answered = false;
+
+  // Only the host advances the game. Everyone else waits for this message.
   broadcast({type:"next",question:currentQuestion});
   showQuestion();
-  questionChanging=false;
+  questionChanging = false;
 }
 
 /* ---------- Board ---------- */
