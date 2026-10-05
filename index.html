@@ -701,80 +701,77 @@ function startGame(){
 function showQuestion(){
 
     answered = false;
-    
     hostAnswered = false;
     guestAnswered = false;
 
     clearInterval(timer);
 
     if(currentQuestion >= questions.length){
-
         finishGame();
-
         return;
-
     }
 
     const q = questions[currentQuestion];
 
     document.getElementById("questionNumber").textContent =
-        (currentQuestion+1) + " / " + questions.length;
+        (currentQuestion + 1) + " / " + questions.length;
 
-    document.getElementById("word").textContent =
-        q.word;
+    document.getElementById("word").textContent = q.word;
 
-   const answersBox =
-    document.getElementById("answers");
+    const answersBox = document.getElementById("answers");
+    answersBox.innerHTML = "";
 
-answersBox.innerHTML = "";
+    // Agar savolda variantlar bo‘lmasa, avtomatik yaratadi
+    let answerList = Array.isArray(q.answers) ? [...q.answers] : [];
 
-const shuffledAnswers = [...q.answers].sort(() => Math.random() - 0.5);
+    if(answerList.length < 4 && typeof wordBank !== "undefined"){
 
-shuffledAnswers.forEach(answer => {
+        const wrongAnswers = wordBank
+            .filter(x => x.uzbek !== q.correct)
+            .sort(() => Math.random() - 0.5)
+            .slice(0, 3)
+            .map(x => x.uzbek);
 
-    const btn = document.createElement("button");
+        answerList = [q.correct, ...wrongAnswers];
+    }
 
-    btn.className = "answer";
+    answerList = [...new Set(answerList)]
+        .sort(() => Math.random() - 0.5);
 
-    btn.textContent = answer;
+    answerList.forEach(answer => {
 
-    btn.onclick = function(){
+        const btn = document.createElement("button");
 
-        answerQuestion(answer, btn);
+        btn.className = "answer";
+        btn.type = "button";
+        btn.textContent = answer;
 
-    };
+        btn.onclick = function(){
+            answerQuestion(answer, btn);
+        };
 
-    answersBox.appendChild(btn);
-
-});
-
+        answersBox.appendChild(btn);
+    });
 
     timeLeft = 15;
-
     updateTimer();
 
     timer = setInterval(function(){
 
         timeLeft--;
-
         updateTimer();
 
         if(timeLeft <= 0){
 
             clearInterval(timer);
-
             disableAnswers();
 
             if(isHost){
-
                 nextQuestion();
-
             }
-
         }
 
     },1000);
-
 }
 
 
@@ -883,7 +880,6 @@ function updateScores(){
         isHost ? opponentScore : myScore;
 
     updateLeaderboard();
-
 }
 
 
@@ -892,14 +888,9 @@ function updateScores(){
 ========================= */
 
 
-/* =========================
-   LEADERBOARD
-   ========================= */
-
 function updateLeaderboard(){
 
     const list = document.getElementById("leaderboardList");
-
     if(!list) return;
 
     const players = [
@@ -920,17 +911,14 @@ function updateLeaderboard(){
     players.forEach((player,index) => {
 
         const row = document.createElement("div");
-
-        row.className =
-            "leaderboard-row" +
-            (index === 0 ? " first" : "");
+        row.className = "leaderboard-row" + (index === 0 ? " first" : "");
 
         const medals = ["🥇","🥈","🥉"];
         const rank = medals[index] || ((index + 1) + ".");
 
         row.innerHTML =
             '<div class="leaderboard-rank">' + rank + '</div>' +
-            '<div class="leaderboard-name">' + player.name + '</div>' +
+            '<div class="leaderboard-name">' + (player.name || "Player") + '</div>' +
             '<div class="leaderboard-score">' + player.score + ' ball</div>';
 
         list.appendChild(row);
