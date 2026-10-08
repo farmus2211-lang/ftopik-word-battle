@@ -8,8 +8,8 @@
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-database-compat.js"></script>
-<script src="firebase-config.js?v=20261009"></script>
-<script src="questions.js?v=20261009"></script>
+<script src="firebase-config.js?v=20261008"></script>
+<script src="questions.js?v=20261007"></script>
 
 <style>
 *{box-sizing:border-box}
@@ -154,7 +154,9 @@ button:disabled{opacity:.55;cursor:not-allowed}
     <div id="winnerSub" class="winner-sub"></div>
     <div id="finalTable" class="final-table"></div>
     <div id="statsGrid" class="stats-grid"></div>
-    <button onclick="location.reload()">🔄 Yana o‘ynash</button>
+    <button id="rematchBtn" class="hidden" onclick="rematchGame()">🔁 Shu o‘yinchilar bilan qayta o‘ynash</button>
+    <div id="rematchInfo" class="small hidden">⏳ Host qayta o‘yinni boshlashini kuting...</div>
+    <button class="secondary" onclick="location.reload()">🚪 Chiqish</button>
   </div>
 </div>
 
@@ -210,28 +212,14 @@ function generateQuestions(count){
 function publicQuestions(list){ return (list||[]).map(q=>({word:q.word,answers:Array.isArray(q.answers)?q.answers:[]})); }
 function createPlayer(name){ return {name:String(name||"Player").slice(0,30),score:0,combo:0,maxCombo:0,correct:0,wrong:0,fastBonus:0,answerTime:0,answers:0,answered:false,connected:true,lastQuestion:-1,lastCorrect:null}; }
 
-function firebaseErrorText(err){
-  if(!err) return "Noma'lum Firebase xatosi.";
-  return (err.code ? err.code + " — " : "") + (err.message || String(err));
-}
-
 function initFirebase(){
   if(firebaseReady) return firebaseReady;
   firebaseReady = new Promise(function(resolve){
-    if(typeof firebase === "undefined"){
-      firebaseError = new Error("Firebase SDK yuklanmagan. Internet yoki Firebase scriptlarini tekshiring.");
-      setRoomsStatus("❌ " + firebaseErrorText(firebaseError));
-      resolve(false); return;
-    }
-    if(!window.FTOPIK_FIREBASE_CONFIG){
-      firebaseError = new Error("firebase-config.js yuklanmagan yoki topilmadi.");
-      setRoomsStatus("❌ firebase-config.js yuklanmagan.");
-      resolve(false); return;
-    }
     if(!validConfig(window.FTOPIK_FIREBASE_CONFIG)){
-      firebaseError = new Error("Firebase config to‘liq emas: apiKey/projectId/databaseURL tekshiring.");
-      setRoomsStatus("❌ Firebase config noto‘g‘ri.");
-      resolve(false); return;
+      firebaseError = "Firebase config topilmadi.";
+      setRoomsStatus("❌ Firebase config topilmadi.");
+      resolve(false);
+      return;
     }
     try{
       const app=firebase.apps.length?firebase.app():firebase.initializeApp(window.FTOPIK_FIREBASE_CONFIG);
@@ -241,31 +229,26 @@ function initFirebase(){
       db.ref(".info/connected").on("value",s=>{
         const online=!!s.val();
         const el=document.getElementById("connectionLine");
-        if(el) el.textContent=online?"🟢 Serverga ulangan":"🟠 Firebase serveriga ulanmoqda...";
+        if(el) el.textContent=online?"🟢 Serverga ulangan":"🟠 Ulanish qayta tiklanmoqda...";
       });
-      setRoomsStatus("⏳ Anonymous login tekshirilmoqda...");
+      setRoomsStatus("⏳ Firebase ulanmoqda...");
       auth.signInAnonymously().then(function(credential){
         user=credential && credential.user ? credential.user : auth.currentUser;
         if(!user) throw new Error("Anonymous foydalanuvchi yaratilmadi.");
         firebaseError=null;
-        setRoomsStatus("✅ Firebase ulandi. UID: " + user.uid.slice(0,8));
+        setRoomsStatus("✅ Ochiq xonalar tayyor.");
         watchRooms();
         resolve(true);
       }).catch(function(err){
         console.error("Firebase Anonymous Auth error:",err);
         firebaseError=err;
-        let hint="";
-        if(err.code === "auth/unauthorized-domain") hint=" GitHub Pages domenini Firebase Authentication → Settings → Authorized domains ga qo‘shing: farmus2211-lang.github.io";
-        if(err.code === "auth/invalid-api-key") hint=" API key noto‘g‘ri yoki cheklangan.";
-        if(err.code === "auth/operation-not-allowed") hint=" Authentication → Sign-in method → Anonymous = Enabled bo‘lishi kerak.";
-        if(err.code === "auth/network-request-failed") hint=" Internet/DNS yoki brauzer tarmoq blokini tekshiring.";
-        setRoomsStatus("❌ Firebase Auth: " + firebaseErrorText(err) + hint);
+        setRoomsStatus("❌ Firebase Auth xatosi: " + (err.code || err.message || "noma'lum"));
         resolve(false);
       });
     }catch(e){
       console.error("Firebase init error:",e);
       firebaseError=e;
-      setRoomsStatus("❌ Firebase ishga tushmadi: " + firebaseErrorText(e));
+      setRoomsStatus("❌ Firebase ishga tushmadi: " + (e.message || "noma'lum"));
       resolve(false);
     }
   });
@@ -276,7 +259,7 @@ async function ensureFirebaseReady(){
   const ok=await initFirebase();
   if(ok && user && db) return true;
   const err=firebaseError;
-  alert("FIREBASE DIAGNOSTIKA\n\n" + firebaseErrorText(err) + "\n\nAgar auth/unauthorized-domain bo‘lsa, Firebase → Authentication → Settings → Authorized domains ga farmus2211-lang.github.io ni qo‘shing.\n\nAgar auth/operation-not-allowed bo‘lsa, Anonymous Authentication ni yoqing.");
+  alert("Firebase ulanmagan.\n\n" + (err && (err.code || err.message) ? (err.code + "\n" + err.message) : "Anonymous Authentication yoki Firebase sozlamasini tekshiring."));
   return false;
 }
 
@@ -463,8 +446,6 @@ function processCurrentAnswers(forceTimeoutAll){
     }
     if(allAnswered){
       roomRef.child("state").update({revealQuestion:q,revealCorrect:correct}).then(()=>setTimeout(()=>changeToNext(),350));
-    }else if(touched){
-      roomRef.child("state").update({revealQuestion:q,revealCorrect:correct});
     }
   });
 }
@@ -496,9 +477,33 @@ function handleMyResult(p){
 }
 function accuracy(p){return p&&p.answers?Math.round((p.correct/p.answers)*100):0}
 function avgTime(p){return p&&p.answers?(p.answerTime/p.answers).toFixed(1):"0.0"}
+function rematchGame(){
+  if(!isHost || !roomRef) return;
+  const activeIds=Object.keys(players||{}).filter(id=>players[id] && players[id].connected!==false);
+  if(activeIds.length<2){ alert("Qayta o‘ynash uchun kamida 2 ta o‘yinchi kerak."); return; }
+  const qs=generateQuestions(questionCount);
+  if(qs.length!==questionCount){ alert("Savollarni yaratib bo‘lmadi."); return; }
+  const resetPlayers={};
+  activeIds.forEach(function(id){
+    const old=players[id]||{};
+    resetPlayers[id]=createPlayer(old.name||"Player");
+  });
+  const d=serverNow()+GAME_TIME*1000;
+  const state={phase:"game",currentQuestion:0,questionCount:questionCount,deadline:d,questions:publicQuestions(qs),revealQuestion:-1,revealCorrect:null,rematch:true};
+  roomRef.update({
+    meta:{roomId,hostUid:uidKey(),hostName:safeName(),questionCount,maxPlayers:MAX_PLAYERS,playersCount:activeIds.length,started:true,createdAt:firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP},
+    players:resetPlayers,questionsPrivate:qs,state:state,answers:{}
+  }).then(function(){
+    players=resetPlayers; questions=qs; currentQuestion=0; currentState=state; deadline=d;
+    revealQuestion=-1; revealCorrect=null; answered=false; changeLock=false;
+    showGame(); renderQuestion(state.questions[0]); startTimer();
+  }).catch(function(err){ alert("Qayta o‘yinni boshlashda xatolik: "+(err.message||err)); });
+}
+
 function showResultFromState(state){
   document.getElementById("gameScreen").classList.add("hidden");document.getElementById("waitingScreen").classList.add("hidden");document.getElementById("resultScreen").classList.remove("hidden");
   const list=(state.results||[]); if(!list.length)return; const top=Number(list[0].score)||0;const tie=list.filter(p=>Number(p.score||0)===top).length>1;
+  const rematchBtn=document.getElementById("rematchBtn"); const rematchInfo=document.getElementById("rematchInfo"); if(rematchBtn) rematchBtn.classList.toggle("hidden",!isHost); if(rematchInfo) rematchInfo.classList.toggle("hidden",isHost);
   document.getElementById("trophy").textContent=tie?'🤝':'🏆';document.getElementById("winner").textContent=tie?'🤝 Durrang!':'🏆 '+list[0].name+' g‘olib!';document.getElementById("winnerSub").textContent=tie?'Teng natija.':'Ajoyib natija! 🎉';
   document.getElementById("finalTable").innerHTML=list.map((p,i)=>'<div class="final-player '+(i===0?'first':'')+'"><div class="final-head"><div class="final-name">'+(i===0?'🥇 ':'#'+(i+1)+' ')+escapeHtml(p.name)+'</div><div class="final-score">'+(p.score||0)+' ball</div></div><div style="font-size:12px;color:#777;margin-top:5px">✅ '+(p.correct||0)+' • ❌ '+(p.wrong||0)+' • 🎯 '+accuracy(p)+'% • 🔥 x'+(p.maxCombo||0)+' • ⚡ +'+(p.fastBonus||0)+'</div></div>').join("");
   document.getElementById("statsGrid").innerHTML=list.slice(0,6).map(p=>'<div class="stats"><h4>'+escapeHtml(p.name)+'</h4><div class="stats-row"><span>✅ To‘g‘ri</span><span class="stats-val">'+(p.correct||0)+'</span></div><div class="stats-row"><span>❌ Xato</span><span class="stats-val">'+(p.wrong||0)+'</span></div><div class="stats-row"><span>🎯 Aniqlik</span><span class="stats-val">'+accuracy(p)+'%</span></div><div class="stats-row"><span>🔥 Max combo</span><span class="stats-val">x'+(p.maxCombo||0)+'</span></div><div class="stats-row"><span>⚡ Bonus</span><span class="stats-val">+'+(p.fastBonus||0)+'</span></div><div class="stats-row"><span>⏱️ O‘rtacha</span><span class="stats-val">'+avgTime(p)+' s</span></div></div>').join("");
