@@ -8,8 +8,8 @@
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-database-compat.js"></script>
-<script src="firebase-config.js?v=20261008"></script>
-<script src="questions.js?v=20261007"></script>
+<script src="firebase-config.js?v=20261009"></script>
+<script src="questions.js?v=20261009"></script>
 
 <style>
 *{box-sizing:border-box}
@@ -210,14 +210,28 @@ function generateQuestions(count){
 function publicQuestions(list){ return (list||[]).map(q=>({word:q.word,answers:Array.isArray(q.answers)?q.answers:[]})); }
 function createPlayer(name){ return {name:String(name||"Player").slice(0,30),score:0,combo:0,maxCombo:0,correct:0,wrong:0,fastBonus:0,answerTime:0,answers:0,answered:false,connected:true,lastQuestion:-1,lastCorrect:null}; }
 
+function firebaseErrorText(err){
+  if(!err) return "Noma'lum Firebase xatosi.";
+  return (err.code ? err.code + " — " : "") + (err.message || String(err));
+}
+
 function initFirebase(){
   if(firebaseReady) return firebaseReady;
   firebaseReady = new Promise(function(resolve){
+    if(typeof firebase === "undefined"){
+      firebaseError = new Error("Firebase SDK yuklanmagan. Internet yoki Firebase scriptlarini tekshiring.");
+      setRoomsStatus("❌ " + firebaseErrorText(firebaseError));
+      resolve(false); return;
+    }
+    if(!window.FTOPIK_FIREBASE_CONFIG){
+      firebaseError = new Error("firebase-config.js yuklanmagan yoki topilmadi.");
+      setRoomsStatus("❌ firebase-config.js yuklanmagan.");
+      resolve(false); return;
+    }
     if(!validConfig(window.FTOPIK_FIREBASE_CONFIG)){
-      firebaseError = "Firebase config topilmadi.";
-      setRoomsStatus("❌ Firebase config topilmadi.");
-      resolve(false);
-      return;
+      firebaseError = new Error("Firebase config to‘liq emas: apiKey/projectId/databaseURL tekshiring.");
+      setRoomsStatus("❌ Firebase config noto‘g‘ri.");
+      resolve(false); return;
     }
     try{
       const app=firebase.apps.length?firebase.app():firebase.initializeApp(window.FTOPIK_FIREBASE_CONFIG);
@@ -227,26 +241,31 @@ function initFirebase(){
       db.ref(".info/connected").on("value",s=>{
         const online=!!s.val();
         const el=document.getElementById("connectionLine");
-        if(el) el.textContent=online?"🟢 Serverga ulangan":"🟠 Ulanish qayta tiklanmoqda...";
+        if(el) el.textContent=online?"🟢 Serverga ulangan":"🟠 Firebase serveriga ulanmoqda...";
       });
-      setRoomsStatus("⏳ Firebase ulanmoqda...");
+      setRoomsStatus("⏳ Anonymous login tekshirilmoqda...");
       auth.signInAnonymously().then(function(credential){
         user=credential && credential.user ? credential.user : auth.currentUser;
         if(!user) throw new Error("Anonymous foydalanuvchi yaratilmadi.");
         firebaseError=null;
-        setRoomsStatus("✅ Ochiq xonalar tayyor.");
+        setRoomsStatus("✅ Firebase ulandi. UID: " + user.uid.slice(0,8));
         watchRooms();
         resolve(true);
       }).catch(function(err){
         console.error("Firebase Anonymous Auth error:",err);
         firebaseError=err;
-        setRoomsStatus("❌ Firebase Auth xatosi: " + (err.code || err.message || "noma'lum"));
+        let hint="";
+        if(err.code === "auth/unauthorized-domain") hint=" GitHub Pages domenini Firebase Authentication → Settings → Authorized domains ga qo‘shing: farmus2211-lang.github.io";
+        if(err.code === "auth/invalid-api-key") hint=" API key noto‘g‘ri yoki cheklangan.";
+        if(err.code === "auth/operation-not-allowed") hint=" Authentication → Sign-in method → Anonymous = Enabled bo‘lishi kerak.";
+        if(err.code === "auth/network-request-failed") hint=" Internet/DNS yoki brauzer tarmoq blokini tekshiring.";
+        setRoomsStatus("❌ Firebase Auth: " + firebaseErrorText(err) + hint);
         resolve(false);
       });
     }catch(e){
       console.error("Firebase init error:",e);
       firebaseError=e;
-      setRoomsStatus("❌ Firebase ishga tushmadi: " + (e.message || "noma'lum"));
+      setRoomsStatus("❌ Firebase ishga tushmadi: " + firebaseErrorText(e));
       resolve(false);
     }
   });
@@ -257,7 +276,7 @@ async function ensureFirebaseReady(){
   const ok=await initFirebase();
   if(ok && user && db) return true;
   const err=firebaseError;
-  alert("Firebase ulanmagan.\n\n" + (err && (err.code || err.message) ? (err.code + "\n" + err.message) : "Anonymous Authentication yoki Firebase sozlamasini tekshiring."));
+  alert("FIREBASE DIAGNOSTIKA\n\n" + firebaseErrorText(err) + "\n\nAgar auth/unauthorized-domain bo‘lsa, Firebase → Authentication → Settings → Authorized domains ga farmus2211-lang.github.io ni qo‘shing.\n\nAgar auth/operation-not-allowed bo‘lsa, Anonymous Authentication ni yoqing.");
   return false;
 }
 
