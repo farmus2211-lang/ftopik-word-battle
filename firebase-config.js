@@ -1,6 +1,5 @@
-/* F-TOPIK WORD BATTLE - Firebase configuration */
 window.FTOPIK_FIREBASE_CONFIG = {
-    apiKey: "AIzaSyCMsq-SgWtFy6AkS5mBsDtRg_n0JCZcXIs",
+    apiKey: "AIzaSyCMsq-SgWtFy6AkS5mBsDtRg_n0JCZCqXs",
     authDomain: "ftopik-word-battle.firebaseapp.com",
     databaseURL: "https://ftopik-word-battle-default-rtdb.asia-southeast1.firebasedatabase.app",
     projectId: "ftopik-word-battle",
