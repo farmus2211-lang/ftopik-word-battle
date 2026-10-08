@@ -190,6 +190,9 @@ let firebaseReady = null;
 let firebaseError = null;
 let revealQuestion = -1;
 let revealCorrect = null;
+let answerProcessing = false;
+let answerProcessQueued = false;
+let revealScheduled = false;
 
 function validConfig(c){
   return c && c.apiKey && !String(c.apiKey).includes("PASTE_") && c.projectId && !String(c.projectId).includes("PASTE_") && c.databaseURL && !String(c.databaseURL).includes("PASTE_");
@@ -266,10 +269,10 @@ async function ensureFirebaseReady(){
 function watchRooms(){
   if(!db) return;
   if(roomsRef) roomsRef.off();
-  roomsRef=db.ref("rooms");
+  roomsRef=db.ref("rooms").orderByChild("meta/started").equalTo(false);
   roomsRef.on("value",snap=>renderRooms(snap.val()||{}));
 }
-function refreshRooms(){ if(!db){initFirebase();return;} roomsRef.once("value").then(s=>renderRooms(s.val()||{})); }
+function refreshRooms(){ if(!db){initFirebase();return;} if(!roomsRef) watchRooms(); else roomsRef.once("value").then(s=>renderRooms(s.val()||{})); }
 function renderRooms(data){
   const list=document.getElementById("roomsList"); list.innerHTML="";
   const rooms=Object.keys(data||{}).map(k=>data[k]).filter(r=>r && r.meta && r.meta.started!==true && Number(r.meta.playersCount||0)<MAX_PLAYERS).sort((a,b)=>Number(a.meta.createdAt||0)-Number(b.meta.createdAt||0));
@@ -333,7 +336,7 @@ function attachRoomListeners(){
   playersRef.on("value",s=>{players=s.val()||{}; updateMetaCount(); renderWaitingPlayers(); renderBoard(); updateMyBadge(); maybeHostAdvance();});
   stateRef.on("value",s=>{currentState=s.val()||{}; handleState(currentState);});
   myPlayerRef.on("value",s=>{const p=s.val();if(!p)return; players[uidKey()]=p; renderBoard(); updateMyBadge(); handleMyResult(p);});
-  roomRef.child("answers").on("value",()=>{ if(isHost) processCurrentAnswers(); });
+  roomRef.child("answers/"+currentQuestion).on("child_added",()=>{ if(isHost) processCurrentAnswers(false); });
 }
 function updateMetaCount(){
   if(!isHost||!roomRef) return;
@@ -382,7 +385,7 @@ function startGame(){
   const resetPlayers={}; Object.keys(players).forEach(id=>{ const p=Object.assign(createPlayer(players[id].name),players[id]); p.score=0;p.combo=0;p.maxCombo=0;p.correct=0;p.wrong=0;p.fastBonus=0;p.answerTime=0;p.answers=0;p.answered=false;p.connected=true;p.lastQuestion=-1;p.lastCorrect=null; resetPlayers[id]=p; });
   const d=serverNow()+GAME_TIME*1000;
   const state={phase:"game",currentQuestion:0,questionCount,deadline:d,questions:publicQuestions(qs),revealQuestion:-1,revealCorrect:null};
-  roomRef.update({meta:{roomId,hostUid:uidKey(),hostName:safeName(),questionCount,maxPlayers:MAX_PLAYERS,playersCount:Object.keys(players).length,started:true,createdAt:firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP},players:resetPlayers,questionsPrivate:qs,state:state,answers:{}}).then(()=>{questions=qs;});
+  roomRef.update({meta:{roomId,hostUid:uidKey(),hostName:safeName(),questionCount,maxPlayers:MAX_PLAYERS,playersCount:Object.keys(players).length,started:true,createdAt:firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP},players:resetPlayers,state:state,answers:{}}).then(()=>{questions=qs;});
 }
 function showGame(){
   document.getElementById("startScreen").classList.add("hidden");document.getElementById("waitingScreen").classList.add("hidden");document.getElementById("resultScreen").classList.add("hidden");document.getElementById("gameScreen").classList.remove("hidden");
@@ -422,42 +425,103 @@ function maybeHostAdvance(){ if(isHost&&currentState&&currentState.phase==="game
 function getFastBonus(left){if(left>=13)return 5;if(left>=10)return 4;if(left>=7)return 3;if(left>=4)return 2;if(left>=1)return 1;return 0;}
 function processCurrentAnswers(forceTimeoutAll){
   if(!isHost||!currentState||currentState.phase!=="game"||changeLock)return;
-  const q=currentQuestion; const answers=((window.__roomAnswers||{}));
+  if(answerProcessing){ answerProcessQueued=true; return; }
+  answerProcessing=true;
+  const q=currentQuestion;
+
   roomRef.child("answers").child(String(q)).once("value").then(s=>{
     if(q!==currentQuestion||changeLock)return;
     const ans=s.val()||{};
-    let touched=false;
     const correct=questions[q]&&questions[q].correct;
+    const updates={};
+    let touched=false;
+
     Object.keys(ans).forEach(id=>{
       const p=players[id]; const a=ans[id];
       if(!p||p.lastQuestion===q)return;
       const left=Math.max(0,Math.min(GAME_TIME,Number(a.secondsLeft)||0));
       const ok=!a.timeout&&a.answer!=null&&String(a.answer)===String(correct);
-      p.answers=(Number(p.answers)||0)+1; p.answerTime=(Number(p.answerTime)||0)+(GAME_TIME-left); p.lastQuestion=q; p.lastCorrect=ok; p.answered=true;
-      if(ok){p.correct=(Number(p.correct)||0)+1;p.combo=(Number(p.combo)||0)+1;p.maxCombo=Math.max(Number(p.maxCombo)||0,p.combo);const fast=getFastBonus(left);p.fastBonus=(Number(p.fastBonus)||0)+fast;p.score=(Number(p.score)||0)+10+fast+Math.min((p.combo-1)*2,10);}else{p.wrong=(Number(p.wrong)||0)+1;p.combo=0;}
-      roomRef.child("players").child(id).set(p); touched=true;
+
+      p.answers=(Number(p.answers)||0)+1;
+      p.answerTime=(Number(p.answerTime)||0)+(GAME_TIME-left);
+      p.lastQuestion=q;
+      p.lastCorrect=ok;
+      p.answered=true;
+      if(ok){
+        p.correct=(Number(p.correct)||0)+1;
+        p.combo=(Number(p.combo)||0)+1;
+        p.maxCombo=Math.max(Number(p.maxCombo)||0,p.combo);
+        const fast=getFastBonus(left);
+        p.fastBonus=(Number(p.fastBonus)||0)+fast;
+        p.score=(Number(p.score)||0)+10+fast+Math.min((p.combo-1)*2,10);
+      }else{
+        p.wrong=(Number(p.wrong)||0)+1;
+        p.combo=0;
+      }
+      updates["players/"+id]=p;
+      touched=true;
     });
+
     const active=Object.keys(players).filter(id=>players[id]&&players[id].connected!==false);
     const allAnswered=active.length>=2&&active.every(id=>players[id].lastQuestion===q);
+
     if(forceTimeoutAll || (serverNow()>=deadline && !allAnswered)){
-      active.forEach(id=>{if(players[id].lastQuestion!==q){const p=players[id];p.answers=(Number(p.answers)||0)+1;p.wrong=(Number(p.wrong)||0)+1;p.combo=0;p.answerTime=(Number(p.answerTime)||0)+GAME_TIME;p.lastQuestion=q;p.lastCorrect=false;p.answered=true;roomRef.child("players").child(id).set(p);}});
-      changeToNext();
-      return;
+      active.forEach(id=>{
+        if(players[id].lastQuestion!==q){
+          const p=players[id];
+          p.answers=(Number(p.answers)||0)+1;
+          p.wrong=(Number(p.wrong)||0)+1;
+          p.combo=0;
+          p.answerTime=(Number(p.answerTime)||0)+GAME_TIME;
+          p.lastQuestion=q;
+          p.lastCorrect=false;
+          p.answered=true;
+          updates["players/"+id]=p;
+        }
+      });
+      if(Object.keys(updates).length){
+        return roomRef.update(updates).then(()=>changeToNext());
+      }
+      return changeToNext();
     }
+
+    if(touched){
+      return roomRef.update(updates).then(()=>{
+        if(allAnswered){
+          if(revealScheduled) return;
+          revealScheduled=true;
+          return roomRef.child("state").update({revealQuestion:q,revealCorrect:correct})
+            .then(()=>setTimeout(()=>{revealScheduled=false;changeToNext();},350));
+        }
+      });
+    }
+
     if(allAnswered){
-      roomRef.child("state").update({revealQuestion:q,revealCorrect:correct}).then(()=>setTimeout(()=>changeToNext(),350));
+      if(revealScheduled) return;
+      revealScheduled=true;
+      return roomRef.child("state").update({revealQuestion:q,revealCorrect:correct})
+        .then(()=>setTimeout(()=>{revealScheduled=false;changeToNext();},350));
+    }
+  }).catch(err=>console.error("Answer processing error:",err)).finally(()=>{
+    answerProcessing=false;
+    if(answerProcessQueued){
+      answerProcessQueued=false;
+      setTimeout(()=>processCurrentAnswers(false),0);
     }
   });
 }
 function changeToNext(){
   if(!isHost||changeLock||!currentState||currentState.phase!=="game")return;
-  changeLock=true; stopTimer(); const next=currentQuestion+1;
-  roomRef.child("answers").child(String(currentQuestion)).remove().catch(()=>{});
+  changeLock=true; revealScheduled=false; stopTimer(); const next=currentQuestion+1;
+  const oldAnswerRef=roomRef.child("answers/"+String(currentQuestion));
+  oldAnswerRef.remove().catch(()=>{});
   if(next>=questionCount){finishGame();changeLock=false;return;}
   const d=serverNow()+GAME_TIME*1000;
   const updates={"state/currentQuestion":next,"state/deadline":d,"state/revealQuestion":-1,"state/revealCorrect":null};
   Object.keys(players).forEach(id=>{updates["players/"+id+"/answered"]=false;});
-  roomRef.update(updates).finally(()=>{changeLock=false;});
+  roomRef.update(updates).then(()=>{
+    roomRef.child("answers/"+String(next)).on("child_added",()=>{ if(isHost) processCurrentAnswers(false); });
+  }).finally(()=>{changeLock=false;});
 }
 function finishGame(){
   const list=Object.keys(players).map(id=>players[id]).sort((a,b)=>Number(b.score||0)-Number(a.score||0)||Number(b.maxCombo||0)-Number(a.maxCombo||0));
@@ -492,11 +556,12 @@ function rematchGame(){
   const state={phase:"game",currentQuestion:0,questionCount:questionCount,deadline:d,questions:publicQuestions(qs),revealQuestion:-1,revealCorrect:null,rematch:true};
   roomRef.update({
     meta:{roomId,hostUid:uidKey(),hostName:safeName(),questionCount,maxPlayers:MAX_PLAYERS,playersCount:activeIds.length,started:true,createdAt:firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP},
-    players:resetPlayers,questionsPrivate:qs,state:state,answers:{}
+    players:resetPlayers,state:state,answers:{}
   }).then(function(){
     players=resetPlayers; questions=qs; currentQuestion=0; currentState=state; deadline=d;
-    revealQuestion=-1; revealCorrect=null; answered=false; changeLock=false;
+    revealQuestion=-1; revealCorrect=null; answered=false; changeLock=false; revealScheduled=false;
     showGame(); renderQuestion(state.questions[0]); startTimer();
+    roomRef.child("answers/0").on("child_added",()=>{ if(isHost) processCurrentAnswers(false); });
   }).catch(function(err){ alert("Qayta o‘yinni boshlashda xatolik: "+(err.message||err)); });
 }
 
