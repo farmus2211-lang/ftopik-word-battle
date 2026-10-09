@@ -86,6 +86,25 @@ button:disabled{opacity:.55;cursor:not-allowed}
 @keyframes bounce{from{transform:translateY(0) rotate(-3deg)}to{transform:translateY(-10px) rotate(3deg)}}
 @keyframes pop{0%{transform:scale(.7);opacity:0}70%{transform:scale(1.08);opacity:1}100%{transform:scale(1);opacity:1}}
 @keyframes fall{0%{transform:translateY(-10vh) rotate(0);opacity:1}100%{transform:translateY(110vh) rotate(720deg);opacity:0}}
+.rank-chip{display:inline-flex;align-items:center;gap:4px;margin-top:3px;padding:3px 7px;border-radius:999px;background:#f0eaff;color:#673de6;font-size:10px;font-weight:900;white-space:nowrap;border:1px solid #ded0ff}
+.rank-progress-card{margin:15px 0 20px;padding:16px;text-align:left;border:1px solid #e2d5ff;border-radius:18px;background:linear-gradient(135deg,#fbf9ff,#f1eaff)}
+.rank-progress-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.rank-progress-title{font-size:18px;font-weight:900;color:#5124b8}
+.rank-progress-xp{font-size:13px;font-weight:900;color:#673de6}
+.rank-progress-track{height:12px;border-radius:999px;background:#ded8eb;overflow:hidden;margin:12px 0 8px}
+.rank-progress-fill{height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,#673de6,#d44de0);transition:width .8s ease}
+.rank-progress-note{font-size:12px;color:#706681;line-height:1.5}
+.rankup-overlay{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(22,10,45,.78);backdrop-filter:blur(7px);animation:fadeIn .25s ease}
+.rankup-overlay.hidden{display:none!important}
+.rankup-card{width:min(430px,100%);padding:28px 22px;border-radius:26px;text-align:center;color:#fff;background:linear-gradient(145deg,#31116d,#673de6 55%,#b23fce);border:2px solid rgba(255,255,255,.35);box-shadow:0 20px 80px rgba(0,0,0,.35);animation:rankPop .55s cubic-bezier(.2,.9,.2,1.2)}
+.rankup-kicker{font-size:13px;font-weight:900;letter-spacing:4px;color:#ffe58a}
+.rankup-icon{font-size:64px;margin:10px 0;animation:bounce 1s ease-in-out infinite alternate}
+.rankup-heading{font-size:30px;font-weight:1000;margin:0 0 8px}
+.rankup-copy{font-size:14px;color:#eee1ff}
+.rankup-title{font-size:25px;font-weight:1000;margin:16px 0;color:#ffe58a;text-shadow:0 2px 18px rgba(255,225,100,.35)}
+.rankup-button{background:#fff;color:#5124b8;margin-top:15px}
+@keyframes rankPop{0%{transform:scale(.65) translateY(25px);opacity:0}100%{transform:scale(1) translateY(0);opacity:1}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @media(max-width:560px){
   .container{padding:10px}.card{padding:17px;border-radius:19px}.logo{font-size:24px}.word{font-size:38px}.answers{grid-template-columns:1fr}.room-code{font-size:30px}.stats-grid{grid-template-columns:1fr}.board-row{grid-template-columns:28px 1fr auto auto}
 }
@@ -152,6 +171,11 @@ button:disabled{opacity:.55;cursor:not-allowed}
     <h2>O‘yin tugadi!</h2>
     <div id="winner" class="winner"></div>
     <div id="winnerSub" class="winner-sub"></div>
+    <div id="myRankProgress" class="rank-progress-card">
+      <div class="rank-progress-head"><div id="myRankTitle" class="rank-progress-title">🪖 Soldier</div><div id="myRankXP" class="rank-progress-xp">0 XP</div></div>
+      <div class="rank-progress-track"><div id="myRankBar" class="rank-progress-fill"></div></div>
+      <div id="myRankNote" class="rank-progress-note">Keyingi unvongiz sari harakat qiling!</div>
+    </div>
     <div id="podium" class="podium"></div>
     <div class="rating-title">🏅 F-TOPIK reytingi</div>
     <div class="rating-tabs" role="tablist" aria-label="Reyting davri">
@@ -167,6 +191,18 @@ button:disabled{opacity:.55;cursor:not-allowed}
     <button id="rematchBtn" class="hidden" onclick="rematchGame()">🔁 Shu o‘yinchilar bilan qayta o‘ynash</button>
     <div id="rematchInfo" class="small hidden">⏳ Host qayta o‘yinni boshlashini kuting...</div>
     <button class="secondary" onclick="location.reload()">🚪 Chiqish</button>
+  </div>
+</div>
+
+<div id="rankUpOverlay" class="rankup-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="rankUpHeading">
+  <div class="rankup-card">
+    <div class="rankup-kicker">YANGI DARAJA OCHILDI</div>
+    <div class="rankup-icon" id="rankUpIcon">🏆</div>
+    <h2 id="rankUpHeading" class="rankup-heading">RANK UP!</h2>
+    <div class="rankup-copy">Ajoyib natija! Siz yangi unvonga erishdingiz.</div>
+    <div id="rankUpTitle" class="rankup-title">⚔️ Warrior</div>
+    <div id="rankUpTotal" class="rankup-copy">Jami: 0 XP</div>
+    <button class="rankup-button" onclick="closeRankUp()">Davom etish 🚀</button>
   </div>
 </div>
 
@@ -541,8 +577,9 @@ function finishGame(){
 }
 function renderBoard(){
   const box=document.getElementById("playersBoard"); if(!box)return;
+  loadRankCache();
   const list=Object.keys(players||{}).map(id=>({id,...players[id]})).sort((a,b)=>Number(b.score||0)-Number(a.score||0)||Number(b.maxCombo||0)-Number(a.maxCombo||0));
-  box.innerHTML=list.map((p,i)=>'<div class="board-row '+(p.id===uidKey()?'me':'')+'"><div>'+(i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.')+'</div><div class="board-name">'+escapeHtml(p.name)+'</div><div class="combo">'+(p.combo?'🔥 x'+p.combo:'')+'</div><div class="score">'+(Number(p.score)||0)+'</div></div>').join("");
+  box.innerHTML=list.map((p,i)=>{const profile=rankCache[p.id]||{};const title=xpTitle(Number(profile.points)||0);return '<div class="board-row '+(p.id===uidKey()?'me':'')+'"><div>'+(i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.')+'</div><div><div class="board-name">'+escapeHtml(p.name)+'</div><div class="rank-chip">'+title+'</div></div><div class="combo">'+(p.combo?'🔥 x'+p.combo:'')+'</div><div class="score">'+(Number(p.score)||0)+'</div></div>';}).join("");
 }
 function updateMyBadge(){const p=players[uidKey()];document.getElementById("myBadge").textContent=p?"Siz • "+(Number(p.score)||0)+" ball":"Siz";}
 function handleMyResult(p){
@@ -579,18 +616,54 @@ function rematchGame(){
 
 let ratingRecorded = false;
 let ratingPeriod = 'all';
+let rankCache = {};
+let rankCacheLoaded = false;
+let rankCacheLoading = false;
+let rankUpTimer = null;
 const RATING_TZ = 'Asia/Tashkent';
+const RANKS=[
+  {min:0,title:'🪖 Soldier',icon:'🪖'},
+  {min:3000,title:'⚔️ Warrior',icon:'⚔️'},
+  {min:9000,title:'🎯 Sniper',icon:'🎯'},
+  {min:18000,title:'💣 Bomber',icon:'💣'},
+  {min:30000,title:'🔥 Elite',icon:'🔥'},
+  {min:45000,title:'🎖️ General',icon:'🎖️'},
+  {min:65000,title:'♾️ Immortal',icon:'♾️'},
+  {min:90000,title:'⚡ Legend',icon:'⚡'},
+  {min:125000,title:'👑 F-TOPIK Champion',icon:'👑'}
+];
 function xpTitle(xp){
-  xp=Number(xp)||0;
-  if(xp>=125000)return '👑 F-TOPIK Champion';
-  if(xp>=90000)return '⚡ Legend';
-  if(xp>=65000)return '♾️ Immortal';
-  if(xp>=45000)return '🎖️ General';
-  if(xp>=30000)return '🔥 Elite';
-  if(xp>=18000)return '💣 Bomber';
-  if(xp>=9000)return '🎯 Sniper';
-  if(xp>=3000)return '⚔️ Warrior';
-  return '🪖 Soldier';
+  xp=Math.max(0,Number(xp)||0);
+  for(let i=RANKS.length-1;i>=0;i--)if(xp>=RANKS[i].min)return RANKS[i].title;
+  return RANKS[0].title;
+}
+function rankForXP(xp){
+  xp=Math.max(0,Number(xp)||0);let index=0;
+  for(let i=0;i<RANKS.length;i++)if(xp>=RANKS[i].min)index=i;
+  return {rank:RANKS[index],index,next:RANKS[index+1]||null};
+}
+function formatXP(xp){return Math.max(0,Number(xp)||0).toLocaleString('en-US');}
+function renderMyRankProgress(xp){
+  const info=rankForXP(xp);const title=document.getElementById('myRankTitle');const total=document.getElementById('myRankXP');const bar=document.getElementById('myRankBar');const note=document.getElementById('myRankNote');
+  if(!title||!total||!bar||!note)return;
+  title.textContent=info.rank.title;total.textContent=formatXP(xp)+' XP';
+  if(!info.next){bar.style.width='100%';note.textContent='🏆 Eng yuqori unvon! Siz F-TOPIK Champion darajasidasiz!';return;}
+  const gained=Math.max(0,Number(xp)-info.rank.min);const needed=info.next.min-info.rank.min;const pct=Math.max(0,Math.min(100,gained/needed*100));
+  bar.style.width=pct.toFixed(1)+'%';note.textContent='Keyingi unvon: '+info.next.title+' • Yana '+formatXP(info.next.min-Number(xp))+' XP kerak';
+}
+function closeRankUp(){const el=document.getElementById('rankUpOverlay');if(el)el.classList.add('hidden');if(rankUpTimer){clearTimeout(rankUpTimer);rankUpTimer=null;}}
+function showRankUp(title,xp){
+  const info=rankForXP(xp);const el=document.getElementById('rankUpOverlay');if(!el)return;
+  document.getElementById('rankUpTitle').textContent=title;document.getElementById('rankUpIcon').textContent=info.rank.icon;document.getElementById('rankUpTotal').textContent='Jami: '+formatXP(xp)+' XP';
+  el.classList.remove('hidden');launchConfetti();if(rankUpTimer)clearTimeout(rankUpTimer);rankUpTimer=setTimeout(closeRankUp,6000);
+}
+function loadRankCache(){
+  if(!db||rankCacheLoaded||rankCacheLoading)return;
+  rankCacheLoading=true;
+  db.ref('ratings').once('value').then(s=>{
+    const data=s.val()||{};Object.keys(data).forEach(id=>{rankCache[id]={points:Number(data[id]?.points)||0,name:data[id]?.name||'Player'};});
+    rankCacheLoaded=true;rankCacheLoading=false;renderBoard();
+  }).catch(e=>{rankCacheLoading=false;console.warn('Rank badges load error',e);});
 }
 function localDateParts(ts){
   const parts=new Intl.DateTimeFormat('en-CA',{timeZone:RATING_TZ,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(ts));
@@ -627,11 +700,19 @@ function recordMyRating(list){
   const gameKey=ref.child('history').push().key;
   const score=Number(me.score)||0;
   const won=Number(list[0]?.score||0)===score && Number(list.filter(p=>Number(p.score||0)===score).length)===1;
+  let previousXP=0;
   ref.transaction(current=>{
-    const old=current||{};
+    const old=current||{};previousXP=Number(old.points)||0;
     const history=old.history||{};
     history[gameKey]={points:score,won:won,at:Date.now()};
-    return {name:safeName(),points:Number(old.points||0)+score,games:Number(old.games||0)+1,wins:Number(old.wins||0)+(won?1:0),bestScore:Math.max(Number(old.bestScore||0),score),history:history,updatedAt:Date.now()};
+    return {name:safeName(),points:previousXP+score,games:Number(old.games||0)+1,wins:Number(old.wins||0)+(won?1:0),bestScore:Math.max(Number(old.bestScore||0),score),history:history,updatedAt:Date.now()};
+  }).then(result=>{
+    if(!result.committed)return;
+    const saved=result.snapshot.val()||{};const newXP=Number(saved.points)||0;
+    rankCache[uidKey()]={points:newXP,name:safeName()};rankCacheLoaded=true;
+    renderMyRankProgress(newXP);renderBoard();
+    if(xpTitle(previousXP)!==xpTitle(newXP))showRankUp(xpTitle(newXP),newXP);
+    loadGlobalRating();
   }).catch(e=>{ratingRecorded=false;console.warn('Rating save error',e);});
 }
 function loadGlobalRating(){
@@ -658,6 +739,8 @@ function showResultFromState(state){
   const rematchBtn=document.getElementById("rematchBtn"); const rematchInfo=document.getElementById("rematchInfo"); if(rematchBtn) rematchBtn.classList.toggle("hidden",!isHost); if(rematchInfo) rematchInfo.classList.toggle("hidden",isHost);
   document.getElementById("trophy").textContent=tie?'🤝':'🏆';document.getElementById("winner").textContent=tie?'🤝 Durrang!':'🏆 '+list[0].name+' g‘olib!';document.getElementById("winnerSub").textContent=tie?'Teng natija.':'Ajoyib natija! 🎉';
   renderPodium(list);
+  renderMyRankProgress(Number((rankCache[uidKey()]||{}).points)||0);
+  if(db&&uidKey())db.ref('ratings/'+uidKey()+'/points').once('value').then(s=>renderMyRankProgress(Number(s.val())||0)).catch(()=>{});
   recordMyRating(list);
   loadGlobalRating();
   document.getElementById("finalTable").innerHTML=list.map((p,i)=>'<div class="final-player '+(i===0?'first':'')+'"><div class="final-head"><div class="final-name">'+(i===0?'🥇 ':'#'+(i+1)+' ')+escapeHtml(p.name)+'</div><div class="final-score">'+(p.score||0)+' ball</div></div><div style="font-size:12px;color:#777;margin-top:5px">✅ '+(p.correct||0)+' • ❌ '+(p.wrong||0)+' • 🎯 '+accuracy(p)+'% • 🔥 x'+(p.maxCombo||0)+' • ⚡ +'+(p.fastBonus||0)+'</div></div>').join("");
