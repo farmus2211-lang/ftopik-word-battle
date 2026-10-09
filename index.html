@@ -341,7 +341,7 @@ function generateQuestions(count){
         .sort(() => Math.random() - 0.5);
 
       return {
-        word: "Ma’nosi: " + item.meaning + "\nMos grammatikani tanlang:",
+        word: item.meaning,
         answers,
         correct: item.grammar
       };
