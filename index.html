@@ -486,9 +486,19 @@ function submitAnswer(answer,btn,isTimeout){
   if(answered||!roomRef||!currentState||currentState.phase!=="game")return;
   answered=true;disableAnswers();
   if(!isTimeout){
-    // Mijoz qurilmada correct javob bo‘lmasligi mumkin; natijani host tasdiqlaydi.
     window.__ftopikSelectedAnswer=answer;
-    document.getElementById("feedback").textContent="⏳ Javob tekshirilmoqda...";
+    const correctAnswer=(questions[currentQuestion]||{}).correct;
+    if(String(answer)===String(correctAnswer)){
+      if(btn)btn.classList.add("correct");
+      document.getElementById("feedback").textContent="✅ To‘g‘ri!";
+    }else{
+      if(btn)btn.classList.add("wrong");
+      // Xato tanlovda to‘g‘ri javobni ham darhol yashil ko‘rsatamiz.
+      document.querySelectorAll(".answer").forEach(b=>{
+        if(b.textContent===String(correctAnswer))b.classList.add("correct");
+      });
+      document.getElementById("feedback").textContent="❌ Noto‘g‘ri!";
+    }
   }else{
     document.getElementById("feedback").textContent="⏰ Vaqt tugadi. Raqibingizning javobini kuting...";
   }
@@ -622,25 +632,25 @@ function renderBoard(){
 }
 function updateMyBadge(){const p=players[uidKey()];document.getElementById("myBadge").textContent=p?"Siz • "+(Number(p.score)||0)+" ball":"Siz";}
 function handleMyResult(p){
-  // Natija faqat host tekshirgan lastCorrect qiymatiga asoslanadi.
+  // Faqat joriy savol uchun server tasdiqlagan natijani ko‘rsatamiz.
+  // Mobil qurilmalarda Firebase eventlari turli tartibda kelishi mumkin.
   if(!p || !currentState || currentState.phase!=="game") return;
   const activeQuestion=Number(currentState.currentQuestion ?? currentQuestion);
   if(Number(p.lastQuestion)!==activeQuestion) return;
 
   const feedback=document.getElementById("feedback");
   const buttons=Array.from(document.querySelectorAll(".answer"));
-  const selected=window.__ftopikSelectedAnswer;
-  const selectedBtn=buttons.find(b=>b.textContent===String(selected));
   if(p.lastCorrect===true){
-    if(selectedBtn){selectedBtn.classList.remove("wrong");selectedBtn.classList.add("correct");}
+    buttons.forEach(b=>{
+      b.classList.remove("wrong");
+      if(b.textContent===String((questions[activeQuestion]||{}).correct)) b.classList.add("correct");
+    });
     feedback.textContent="✅ To‘g‘ri! "+(p.score||0)+" ball";
   }else if(p.lastCorrect===false){
-    if(selectedBtn){selectedBtn.classList.remove("correct");selectedBtn.classList.add("wrong");}
-    const correct=revealCorrect || (currentState.state && currentState.state.revealCorrect) || null;
-    if(correct!=null){
-      const correctBtn=buttons.find(b=>b.textContent===String(correct));
-      if(correctBtn)correctBtn.classList.add("correct");
-    }
+    // Javob noto‘g‘ri bo‘lsa, tanlangan variant qizil qoladi,
+    // serverdagi to‘g‘ri javob ma’lum bo‘lsa yashil ko‘rsatiladi.
+    const correct=(questions[activeQuestion]||{}).correct;
+    buttons.forEach(b=>{if(correct!=null && b.textContent===String(correct)) b.classList.add("correct");});
     feedback.textContent="❌ Noto‘g‘ri!";
   }
 }
