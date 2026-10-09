@@ -133,6 +133,14 @@ button:disabled{opacity:.55;cursor:not-allowed}
     <button class="secondary" onclick="openTeacherPanel()">👨‍🏫 O‘qituvchi paneli</button>
     <h2 style="margin-top:0">🎮 O‘yinni boshlash</h2>
     <input id="nameInput" placeholder="Ismingizni kiriting" autocomplete="off">
+    <label for="battleMode">⚔️ O‘yin rejimi</label>
+    <select id="battleMode" onchange="updateModeHelp()">
+      <option value="open">🌍 Open Battle — 2–50 o‘yinchi</option>
+      <option value="duel">⚔️ 1 vs 1 — faqat 2 o‘yinchi</option>
+      <option value="team">👥 Team Battle — ikki jamoa</option>
+      <option value="boss">👑 Boss Battle — qiyin sinov</option>
+    </select>
+    <div id="modeHelp" class="small">Ochiq xona: 2–50 o‘yinchi.</div>
     <label for="questionMode">🎯 Savollar soni</label>
     <select id="questionMode">
       <option value="10">10 ta savol</option>
@@ -258,6 +266,7 @@ let roomId = "";
 let isHost = false;
 let myName = "";
 let questionCount = 10;
+let battleMode = "open";
 let questions = [];
 let currentState = null;
 let players = {};
@@ -286,6 +295,13 @@ function validConfig(c){
 function setRoomsStatus(s){ const el=document.getElementById("roomsStatus"); if(el) el.textContent=s; }
 function serverNow(){ return Date.now() + serverOffset; }
 function roomPath(){ return "rooms/" + roomId; }
+function updateModeHelp(){
+  const mode=document.getElementById("battleMode")?.value||"open";
+  const help={open:"🌍 Open Battle: 2–50 o‘yinchi, har kim individual ball to‘playdi.",duel:"⚔️ 1 vs 1: aynan 2 o‘yinchi bellashadi.",team:"👥 Team Battle: o‘yinchilar avtomatik ravishda ikki jamoaga bo‘linadi.",boss:"👑 Boss Battle: 30 ta savol, har savolga 10 soniya. Eng yuqori ball g‘olib bo‘ladi."};
+  const el=document.getElementById("modeHelp");if(el)el.textContent=help[mode]||help.open;
+  const q=document.getElementById("questionMode");if(q&&mode==="boss"){q.value="30";}
+}
+function modeLabel(mode){return ({open:"🌍 Open Battle",duel:"⚔️ 1 vs 1",team:"👥 Team Battle",boss:"👑 Boss Battle"})[mode]||"🌍 Open Battle";}
 function safeName(){ return (myName || "Player").trim().slice(0,30) || "Player"; }
 function uidKey(){ return String(user && user.uid || ""); }
 function escapeHtml(v){ return String(v).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"})[ch]); }
@@ -457,7 +473,7 @@ function renderRooms(data){
   rooms.forEach(r=>{
     const id=r.meta.roomId || "";
     const row=document.createElement("div"); row.className="room-row";
-    row.innerHTML='<div class="room-main"><div class="room-title">👤 '+escapeHtml(r.meta.hostName||"O‘qituvchi")+'</div><div class="room-meta">'+(Number(r.meta.questionCount)||10)+' savol • '+(Number(r.meta.playersCount)||1)+'/'+MAX_PLAYERS+' o‘yinchi</div></div>';
+    row.innerHTML='<div class="room-main"><div class="room-title">👤 '+escapeHtml(r.meta.hostName||"O‘qituvchi")+'</div><div class="room-meta">'+(Number(r.meta.questionCount)||10)+' savol • '+(Number(r.meta.playersCount)||1)+'/'+(Number(r.meta.maxPlayers)||MAX_PLAYERS)+' o‘yinchi • '+escapeHtml(modeLabel(r.meta.mode))+'</div></div>'; 
     const b=document.createElement("button"); b.className="join-btn"; b.textContent="Qo‘shilish"; b.onclick=()=>joinPublicRoom(id); row.appendChild(b); list.appendChild(row);
   });
 }
@@ -465,13 +481,16 @@ function renderRooms(data){
 function createRoom(){
   myName=document.getElementById("nameInput").value.trim();
   questionCount=Number(document.getElementById("questionMode").value)||10;
+  battleMode=document.getElementById("battleMode")?.value||"open";
+  if(battleMode==="boss")questionCount=30;
   if(!myName){alert("Avval ismingizni kiriting!");return;}
   ensureFirebaseReady().then(function(ok){
     if(!ok) return;
     roomId=randomRoomId(); isHost=true;
   roomRef=db.ref(roomPath());
-  const p=createPlayer(myName); players={}; players[uidKey()]=p;
-  const meta={roomId,hostUid:uidKey(),hostName:safeName(),questionCount,maxPlayers:MAX_PLAYERS,playersCount:1,started:false,createdAt:firebase.database.ServerValue.TIMESTAMP};
+  const p=createPlayer(myName); p.team=battleMode==="team"?"A":null; players={}; players[uidKey()]=p;
+  const roomLimit=battleMode==="duel"?2:MAX_PLAYERS;
+  const meta={roomId,hostUid:uidKey(),hostName:safeName(),questionCount,mode:battleMode,maxPlayers:roomLimit,playersCount:1,started:false,createdAt:firebase.database.ServerValue.TIMESTAMP};
   roomRef.set({meta:meta,players:{[uidKey()]:p},state:{phase:"waiting",currentQuestion:0,questionCount,deadline:0}}).then(()=>{
     roomRef.child("meta").onDisconnect().remove();
     roomRef.child("players").child(uidKey()).onDisconnect().remove();
@@ -499,8 +518,12 @@ function joinRoom(id){
     const r=s.val();
     if(!r||!r.meta||r.meta.started){alert("Bu xona mavjud emas yoki o‘yin boshlangan.");refreshRooms();return;}
     const count=Object.keys(r.players||{}).length;
-    if(count>=MAX_PLAYERS){alert("Xona to‘ldi (50/50).");return;}
-    const p=createPlayer(myName);
+    const mode=r.meta.mode||"open";const limit=Number(r.meta.maxPlayers)||(mode==="duel"?2:MAX_PLAYERS);
+    if(count>=limit){alert("Xona to‘ldi ("+limit+"/"+limit+").");return;}
+    battleMode=mode;questionCount=Number(r.meta.questionCount)||10;
+    const modeSelect=document.getElementById("battleMode");if(modeSelect)modeSelect.value=mode;
+    const qSelect=document.getElementById("questionMode");if(qSelect)qSelect.value=String(questionCount);
+    const p=createPlayer(myName);if(mode==="team")p.team=(count%2===0?"A":"B");
     return roomRef.child("players").child(uidKey()).set(p).then(()=>roomRef.child("players").child(uidKey()).onDisconnect().remove()).then(()=>showWaiting(false)).then(()=>attachRoomListeners());
   }).catch(e=>{console.error(e);alert("Xonaga kirib bo‘lmadi: "+e.message);});
 }
@@ -557,11 +580,17 @@ function renderWaitingPlayers(){
 }
 function startGame(){
   if(!isHost||!roomRef||Object.keys(players).length<2)return;
+  const mode=battleMode||document.getElementById("battleMode")?.value||"open";
+  const countNow=Object.keys(players).length;
+  if(mode==="duel"&&countNow!==2){alert("1 vs 1 rejimi uchun aynan 2 o‘yinchi kerak.");return;}
+  if(mode==="team"&&countNow<4){alert("Team Battle uchun kamida 4 o‘yinchi tavsiya etiladi.");return;}
+  if(mode==="boss")questionCount=30;
   const qs=generateQuestions(questionCount); if(qs.length!==questionCount){alert("Savollarni yaratib bo‘lmadi.");return;}
   const resetPlayers={}; Object.keys(players).forEach(id=>{ const p=Object.assign(createPlayer(players[id].name),players[id]); p.score=0;p.combo=0;p.maxCombo=0;p.correct=0;p.wrong=0;p.fastBonus=0;p.answerTime=0;p.answers=0;p.answered=false;p.connected=true;p.lastQuestion=-1;p.lastCorrect=null; resetPlayers[id]=p; });
-  const d=serverNow()+GAME_TIME*1000;
-  const state={phase:"game",currentQuestion:0,questionCount,deadline:d,questions:publicQuestions(qs),revealQuestion:-1,revealCorrect:null};
-  roomRef.update({meta:{roomId,hostUid:uidKey(),hostName:safeName(),questionCount,maxPlayers:MAX_PLAYERS,playersCount:Object.keys(players).length,started:true,createdAt:firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP},players:resetPlayers,state:state,answers:{}}).then(()=>{questions=qs;});
+  const d=serverNow()+(mode==="boss"?10:GAME_TIME)*1000;
+  const state={phase:"game",currentQuestion:0,questionCount,mode,deadline:d,questions:publicQuestions(qs),revealQuestion:-1,revealCorrect:null};
+  const roomLimit=mode==="duel"?2:MAX_PLAYERS;
+  roomRef.update({meta:{roomId,hostUid:uidKey(),hostName:safeName(),questionCount,mode,maxPlayers:roomLimit,playersCount:Object.keys(players).length,started:true,createdAt:firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP},players:resetPlayers,state:state,answers:{}}).then(()=>{questions=qs;});
 }
 function showGame(){
   document.getElementById("startScreen").classList.add("hidden");document.getElementById("waitingScreen").classList.add("hidden");document.getElementById("resultScreen").classList.add("hidden");document.getElementById("gameScreen").classList.remove("hidden");
@@ -570,7 +599,7 @@ function renderQuestion(q){
   if(!q)return;
   window.__ftopikSelectedAnswer=undefined;
   answered=false;
-  document.getElementById("questionNumber").textContent=(currentQuestion+1)+" / "+questionCount;
+  document.getElementById("questionNumber").textContent=(currentQuestion+1)+" / "+questionCount+(currentState?.mode?" · "+modeLabel(currentState.mode):"");
   document.getElementById("word").textContent=q.word;
   document.getElementById("feedback").textContent="";
   const box=document.getElementById("answers");
@@ -741,7 +770,7 @@ function changeToNext(){
   const oldAnswerRef=roomRef.child("answers/"+String(currentQuestion));
   oldAnswerRef.remove().catch(()=>{});
   if(next>=questionCount){finishGame();changeLock=false;return;}
-  const d=serverNow()+GAME_TIME*1000;
+  const d=serverNow()+((currentState&&currentState.mode)==="boss"?10:GAME_TIME)*1000;
   const updates={"state/currentQuestion":next,"state/deadline":d,"state/revealQuestion":-1,"state/revealCorrect":null};
   Object.keys(players).forEach(id=>{updates["players/"+id+"/answered"]=false;});
   roomRef.update(updates).then(()=>{
@@ -932,7 +961,7 @@ function loadGlobalRating(){
 
 function showResultFromState(state){
   document.getElementById("gameScreen").classList.add("hidden");document.getElementById("waitingScreen").classList.add("hidden");document.getElementById("resultScreen").classList.remove("hidden");
-  const list=(state.results||[]); if(!list.length)return; const top=Number(list[0].score)||0;const tie=list.filter(p=>Number(p.score||0)===top).length>1;
+  const list=(state.results||[]); if(!list.length)return; const mode=state.mode||battleMode||"open"; if(mode==="team"){const totals={A:0,B:0};list.forEach(p=>{const team=(players[p.uid]||{}).team;if(team)totals[team]+=Number(p.score)||0;});document.getElementById("winner").textContent=totals.A===totals.B?"🤝 Jamoalar durang!":(totals.A>totals.B?"🏆 🔵 A jamoa g‘olib!":"🏆 🔴 B jamoa g‘olib!");document.getElementById("winnerSub").textContent="🔵 A jamoa: "+totals.A+" ball · 🔴 B jamoa: "+totals.B+" ball";}else if(mode==="boss"){document.getElementById("winnerSub").textContent="👑 Boss Battle yakunlandi! Eng yuqori ball g‘olib bo‘ldi.";} const top=Number(list[0].score)||0;const tie=list.filter(p=>Number(p.score||0)===top).length>1;
   const rematchBtn=document.getElementById("rematchBtn"); const rematchInfo=document.getElementById("rematchInfo"); if(rematchBtn) rematchBtn.classList.toggle("hidden",!isHost); if(rematchInfo) rematchInfo.classList.toggle("hidden",isHost);
   document.getElementById("trophy").textContent=tie?'🤝':'🏆';document.getElementById("winner").textContent=tie?'🤝 Durrang!':'🏆 '+list[0].name+' g‘olib!';document.getElementById("winnerSub").textContent=tie?'Teng natija.':'Ajoyib natija! 🎉';
   renderPodium(list);
