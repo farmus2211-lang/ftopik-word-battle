@@ -70,7 +70,7 @@ button:disabled{opacity:.55;cursor:not-allowed}
 .trophy{font-size:70px;animation:bounce 1s ease-in-out infinite alternate}
 .winner{font-size:28px;font-weight:900;color:#673de6;animation:pop .7s ease both;margin:9px 0}
 .winner-sub{color:#777;margin-bottom:15px}
-.podium{display:grid;grid-template-columns:1fr 1.15fr 1fr;align-items:end;gap:8px;margin:18px 0 16px}.podium-item{border-radius:16px;padding:12px 7px;background:#f7f3ff;border:1px solid #e7ddff}.podium-item.first{padding-top:20px;background:#fff8df}.podium-medal{font-size:30px}.podium-name{font-weight:900;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.podium-score{font-weight:900;color:#673de6;margin-top:4px}.rating-title{text-align:left;font-weight:900;margin:18px 0 8px}.global-rating{display:grid;gap:6px;margin-bottom:14px}.rating-row{display:grid;grid-template-columns:28px 1fr auto auto;gap:7px;align-items:center;padding:8px 10px;background:#faf9ff;border:1px solid #ece7fb;border-radius:10px;font-size:13px}.rating-row.me{background:#f0eaff;border-color:#d8c9ff}.rating-name{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rating-points{font-weight:900;color:#673de6}.final-table{display:grid;gap:8px;text-align:left}
+.podium{display:grid;grid-template-columns:1fr 1.15fr 1fr;align-items:end;gap:8px;margin:18px 0 16px}.podium-item{border-radius:16px;padding:12px 7px;background:#f7f3ff;border:1px solid #e7ddff}.podium-item.first{padding-top:20px;background:#fff8df}.podium-medal{font-size:30px}.podium-name{font-weight:900;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.podium-score{font-weight:900;color:#673de6;margin-top:4px}.rating-title{text-align:left;font-weight:900;margin:18px 0 8px}.rating-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0 10px}.rating-tab{padding:10px 5px;margin:0;background:#f0eaff;color:#5f35bb;font-size:13px;border:1px solid #e1d6ff}.rating-tab.active{background:linear-gradient(135deg,#673de6,#9b45d9);color:#fff}.rating-summary{font-size:12px;color:#777;margin:0 0 8px;text-align:left}.global-rating{display:grid;gap:6px;margin-bottom:14px}.rating-row{display:grid;grid-template-columns:28px 1fr auto auto;gap:7px;align-items:center;padding:8px 10px;background:#faf9ff;border:1px solid #ece7fb;border-radius:10px;font-size:13px}.rating-row.me{background:#f0eaff;border-color:#d8c9ff}.rating-name{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rating-subtitle{font-size:11px;color:#8a70b8;font-weight:700;margin-top:3px}.rating-points{font-weight:900;color:#673de6}.final-table{display:grid;gap:8px;text-align:left}
 .final-player{background:#faf9ff;border:1px solid #ece7fb;border-radius:14px;padding:12px}
 .final-player.first{background:#fff9e8}
 .final-head{display:flex;justify-content:space-between;gap:10px}
@@ -153,7 +153,14 @@ button:disabled{opacity:.55;cursor:not-allowed}
     <div id="winner" class="winner"></div>
     <div id="winnerSub" class="winner-sub"></div>
     <div id="podium" class="podium"></div>
-    <div class="rating-title">🏅 F-TOPIK Umumiy reyting</div>
+    <div class="rating-title">🏅 F-TOPIK reytingi</div>
+    <div class="rating-tabs" role="tablist" aria-label="Reyting davri">
+      <button class="rating-tab active" data-period="all" onclick="selectRatingPeriod('all')">🌍 Umumiy</button>
+      <button class="rating-tab" data-period="daily" onclick="selectRatingPeriod('daily')">☀️ Kunlik</button>
+      <button class="rating-tab" data-period="weekly" onclick="selectRatingPeriod('weekly')">📅 Haftalik</button>
+      <button class="rating-tab" data-period="monthly" onclick="selectRatingPeriod('monthly')">🗓️ Oylik</button>
+    </div>
+    <div id="ratingSummary" class="rating-summary">XP — barcha o‘yinlarda to‘plangan ballar.</div>
     <div id="globalRating" class="global-rating"></div>
     <div id="finalTable" class="final-table"></div>
     <div id="statsGrid" class="stats-grid"></div>
@@ -164,7 +171,7 @@ button:disabled{opacity:.55;cursor:not-allowed}
 </div>
 
 <script>
-const MAX_PLAYERS = 50;
+const MAX_PLAYERS = 30;
 const GAME_TIME = 15;
 
 let db = null;
@@ -547,6 +554,7 @@ function accuracy(p){return p&&p.answers?Math.round((p.correct/p.answers)*100):0
 function avgTime(p){return p&&p.answers?(p.answerTime/p.answers).toFixed(1):"0.0"}
 function rematchGame(){
   if(!isHost || !roomRef) return;
+  ratingRecorded=false;
   const activeIds=Object.keys(players||{}).filter(id=>players[id] && players[id].connected!==false);
   if(activeIds.length<2){ alert("Qayta o‘ynash uchun kamida 2 ta o‘yinchi kerak."); return; }
   const qs=generateQuestions(questionCount);
@@ -570,6 +578,39 @@ function rematchGame(){
 }
 
 let ratingRecorded = false;
+let ratingPeriod = 'all';
+const RATING_TZ = 'Asia/Tashkent';
+function xpTitle(xp){
+  xp=Number(xp)||0;
+  if(xp>=125000)return '👑 F-TOPIK Champion';
+  if(xp>=90000)return '⚡ Legend';
+  if(xp>=65000)return '♾️ Immortal';
+  if(xp>=45000)return '🎖️ General';
+  if(xp>=30000)return '🔥 Elite';
+  if(xp>=18000)return '💣 Bomber';
+  if(xp>=9000)return '🎯 Sniper';
+  if(xp>=3000)return '⚔️ Warrior';
+  return '🪖 Soldier';
+}
+function localDateParts(ts){
+  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:RATING_TZ,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(ts));
+  const out={};parts.forEach(p=>{if(p.type!=='literal')out[p.type]=Number(p.value)});return out;
+}
+function ratingPeriodStart(period,now){
+  const p=localDateParts(now);const localMidnight=Date.UTC(p.year,p.month-1,p.day);let start=localMidnight-5*3600000; // Uzbekistan is UTC+5
+  if(period==='weekly'){
+    const day=new Date(localMidnight).getUTCDay();
+    start-=((day+6)%7)*86400000; // Monday is the first day of the week
+  }else if(period==='monthly'){
+    start=Date.UTC(p.year,p.month-1,1)-5*3600000;
+  }
+  return start;
+}
+function selectRatingPeriod(period){
+  ratingPeriod=period;
+  document.querySelectorAll('.rating-tab').forEach(b=>b.classList.toggle('active',b.dataset.period===period));
+  loadGlobalRating();
+}
 function renderPodium(list){
   const el=document.getElementById("podium"); if(!el)return;
   const top=list.slice(0,3);
@@ -583,20 +624,32 @@ function recordMyRating(list){
   if(!me)return;
   ratingRecorded=true;
   const ref=db.ref('ratings/'+uidKey());
-  ref.once('value').then(s=>{
-    const old=s.val()||{};
-    const won=Number(list[0]?.score||0)===Number(me.score||0) && Number(list.filter(p=>Number(p.score||0)===Number(me.score||0)).length)===1;
-    return ref.set({name:safeName(),points:Number(old.points||0)+Number(me.score||0),games:Number(old.games||0)+1,wins:Number(old.wins||0)+(won?1:0),bestScore:Math.max(Number(old.bestScore||0),Number(me.score||0)),updatedAt:firebase.database.ServerValue.TIMESTAMP});
+  const gameKey=ref.child('history').push().key;
+  const score=Number(me.score)||0;
+  const won=Number(list[0]?.score||0)===score && Number(list.filter(p=>Number(p.score||0)===score).length)===1;
+  ref.transaction(current=>{
+    const old=current||{};
+    const history=old.history||{};
+    history[gameKey]={points:score,won:won,at:Date.now()};
+    return {name:safeName(),points:Number(old.points||0)+score,games:Number(old.games||0)+1,wins:Number(old.wins||0)+(won?1:0),bestScore:Math.max(Number(old.bestScore||0),score),history:history,updatedAt:Date.now()};
   }).catch(e=>{ratingRecorded=false;console.warn('Rating save error',e);});
 }
 function loadGlobalRating(){
   const box=document.getElementById('globalRating'); if(!box||!db)return;
+  const summary=document.getElementById('ratingSummary');
+  const periodLabels={all:'Umumiy reyting — jami XP',daily:'Kunlik reyting — bugun to‘plangan ball',weekly:'Haftalik reyting — dushanbadan boshlab to‘plangan ball',monthly:'Oylik reyting — shu oyda to‘plangan ball'};
+  if(summary)summary.textContent=periodLabels[ratingPeriod]||periodLabels.all;
   db.ref('ratings').once('value').then(s=>{
-    const data=s.val()||{};
-    const list=Object.keys(data).map(id=>({id,...data[id]})).sort((a,b)=>Number(b.points||0)-Number(a.points||0)||Number(b.wins||0)-Number(a.wins||0)).slice(0,10);
-    if(!list.length){box.innerHTML='<div class="small">Hali umumiy reyting mavjud emas.</div>';return;}
-    box.innerHTML=list.map((p,i)=>'<div class="rating-row '+(p.id===uidKey()?'me':'')+'"><div>'+(i===0?'👑':i===1?'🥈':i===2?'🥉':'#'+(i+1))+'</div><div class="rating-name">'+escapeHtml(p.name||'Player')+'</div><div class="rating-points">'+(p.points||0)+'</div><div title="O‘yinlar / g‘alabalar">'+(p.games||0)+'🎮 · '+(p.wins||0)+'🏆</div></div>').join('');
-  }).catch(e=>console.warn('Rating load error',e));
+    const data=s.val()||{};const now=Date.now();const start=ratingPeriod==='all'?0:ratingPeriodStart(ratingPeriod,now);
+    const list=Object.keys(data).map(id=>{
+      const p=data[id]||{};let points=0,wins=0,games=0;
+      if(ratingPeriod==='all'){points=Number(p.points)||0;wins=Number(p.wins)||0;games=Number(p.games)||0;}
+      else Object.values(p.history||{}).forEach(g=>{const at=Number(g.at)||0;if(at>=start&&at<=now){points+=Number(g.points)||0;games++;if(g.won)wins++;}});
+      return {id,name:p.name||'Player',points,wins,games,totalXP:Number(p.points)||0};
+    }).filter(p=>p.points>0).sort((a,b)=>b.points-a.points||b.wins-a.wins||b.games-a.games).slice(0,10);
+    if(!list.length){box.innerHTML='<div class="small">'+(ratingPeriod==='all'?'Hali umumiy reyting mavjud emas.':'Bu davrda hali ball to‘plangan emas. O‘ynab reytingga kiring!')+'</div>';return;}
+    box.innerHTML=list.map((p,i)=>'<div class="rating-row '+(p.id===uidKey()?'me':'')+'"><div>'+(i===0?'👑':i===1?'🥈':i===2?'🥉':'#'+(i+1))+'</div><div><div class="rating-name">'+escapeHtml(p.name)+'</div><div class="rating-subtitle">'+xpTitle(p.totalXP)+'</div></div><div class="rating-points">'+p.points+' XP</div><div title="O‘yinlar / g‘alabalar">'+p.games+'🎮 · '+p.wins+'🏆</div></div>').join('');
+  }).catch(e=>{console.warn('Rating load error',e);box.innerHTML='<div class="small">Reytingni yuklashda xatolik yuz berdi.</div>';});
 }
 
 function showResultFromState(state){
