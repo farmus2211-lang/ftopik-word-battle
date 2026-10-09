@@ -8,8 +8,8 @@
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-database-compat.js"></script>
-<script src="firebase-config.js?v=20261011"></script>
-<script src="questions.js?v=20261011"></script>
+<script src="firebase-config.js?v=20261010"></script>
+<script src="questions.js?v=20261010"></script>
 
 <style>
 *{box-sizing:border-box}
@@ -71,7 +71,7 @@ button:disabled{opacity:.55;cursor:not-allowed}
 .winner{font-size:28px;font-weight:900;color:#673de6;animation:pop .7s ease both;margin:9px 0}
 .winner-sub{color:#777;margin-bottom:15px}
 .podium{display:grid;grid-template-columns:1fr 1.15fr 1fr;align-items:end;gap:8px;margin:18px 0 16px}.podium-item{border-radius:16px;padding:12px 7px;background:#f7f3ff;border:1px solid #e7ddff}.podium-item.first{padding-top:20px;background:#fff8df}.podium-medal{font-size:30px}.podium-name{font-weight:900;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.podium-score{font-weight:900;color:#673de6;margin-top:4px}.rating-title{text-align:left;font-weight:900;margin:18px 0 8px}.rating-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0 10px}.rating-tab{padding:10px 5px;margin:0;background:#f0eaff;color:#5f35bb;font-size:13px;border:1px solid #e1d6ff}.rating-tab.active{background:linear-gradient(135deg,#673de6,#9b45d9);color:#fff}.rating-summary{font-size:12px;color:#777;margin:0 0 8px;text-align:left}.global-rating{display:grid;gap:6px;margin-bottom:14px}.rating-row{display:grid;grid-template-columns:28px 1fr auto auto;gap:7px;align-items:center;padding:8px 10px;background:#faf9ff;border:1px solid #ece7fb;border-radius:10px;font-size:13px}.rating-row.me{background:#f0eaff;border-color:#d8c9ff}.rating-name{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rating-subtitle{font-size:11px;color:#8a70b8;font-weight:700;margin-top:3px}.rating-points{font-weight:900;color:#673de6}.final-table{display:grid;gap:8px;text-align:left}
-.final-player{background:#faf9ff;border:1px solid #ece7fb;border-radius:14px;padding:12px}
+.profile-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:12px 0}.profile-stat{background:#faf9ff;border:1px solid #ece7fb;border-radius:13px;padding:13px;text-align:center}.profile-stat strong{display:block;font-size:22px;color:#673de6;margin-top:5px}.profile-history{margin:12px 0}.profile-history-row{display:flex;justify-content:space-between;gap:10px;padding:10px;border-bottom:1px solid #eee}.final-player{background:#faf9ff;border:1px solid #ece7fb;border-radius:14px;padding:12px}
 .final-player.first{background:#fff9e8}
 .final-head{display:flex;justify-content:space-between;gap:10px}
 .final-name{font-weight:900}
@@ -106,16 +106,17 @@ button:disabled{opacity:.55;cursor:not-allowed}
 @keyframes rankPop{0%{transform:scale(.65) translateY(25px);opacity:0}100%{transform:scale(1) translateY(0);opacity:1}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @media(max-width:560px){
-  .container{padding:10px}.card{padding:17px;border-radius:19px}.logo{font-size:24px}.word{font-size:38px}.answers{grid-template-columns:1fr}.room-code{font-size:30px}.stats-grid{grid-template-columns:1fr}.board-row{grid-template-columns:28px 1fr auto auto}
+  .container{padding:10px}.card{padding:17px;border-radius:19px}.logo{font-size:24px}.word{font-size:38px}.answers{grid-template-columns:1fr}.room-code{font-size:30px}.stats-grid,.profile-grid{grid-template-columns:1fr}.board-row{grid-template-columns:28px 1fr auto auto}
 }
 </style>
 </head>
 <body>
 <div class="container">
   <div class="logo">🇰🇷 F-TOPIK WORD BATTLE</div>
-  <div class="subtitle">1–30 o‘yinchi • 10 / 20 / 30 savol • Firebase real-time</div>
+  <div class="subtitle">1–50 o‘yinchi • 10 / 20 / 30 savol • Firebase real-time</div>
 
   <div id="startScreen" class="card">
+    <button class="secondary" onclick="openProfile()">👤 Mening profilim</button>
     <h2 style="margin-top:0">🎮 O‘yinni boshlash</h2>
     <input id="nameInput" placeholder="Ismingizni kiriting" autocomplete="off">
     <label for="questionMode">🎯 Savollar soni</label>
@@ -138,6 +139,13 @@ button:disabled{opacity:.55;cursor:not-allowed}
       <div id="roomsList" class="rooms-list"></div>
       <div class="small">Ochiq xonaga kirish uchun faqat <b>Qo‘shilish</b> tugmasini bosing.</div>
     </div>
+  </div>
+
+  <div id="profileScreen" class="card hidden">
+    <h2 style="margin-top:0;text-align:center">👤 Mening profilim</h2>
+    <div id="profileStatus" class="status">⏳ Profil yuklanmoqda...</div>
+    <div id="profileContent"></div>
+    <button class="secondary" onclick="closeProfile()">⬅️ Bosh sahifaga qaytish</button>
   </div>
 
   <div id="waitingScreen" class="card hidden">
@@ -207,7 +215,7 @@ button:disabled{opacity:.55;cursor:not-allowed}
 </div>
 
 <script>
-const MAX_PLAYERS = 30;
+const MAX_PLAYERS = 50;
 const GAME_TIME = 15;
 
 let db = null;
@@ -248,11 +256,6 @@ function serverNow(){ return Date.now() + serverOffset; }
 function roomPath(){ return "rooms/" + roomId; }
 function safeName(){ return (myName || "Player").trim().slice(0,30) || "Player"; }
 function uidKey(){ return String(user && user.uid || ""); }
-function correctAnswerFor(index){
-  const local=(questions&&questions[index])||{};
-  const shared=(currentState&&Array.isArray(currentState.questions)&&currentState.questions[index])||{};
-  return local.correct!=null?local.correct:shared.correct;
-}
 function escapeHtml(v){ return String(v).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"})[ch]); }
 function randomRoomId(){ const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s=""; for(let i=0;i<6;i++) s+=chars[Math.floor(Math.random()*chars.length)]; return s; }
 function generateQuestions(count){
@@ -265,6 +268,48 @@ function generateQuestions(count){
 }
 function publicQuestions(list){ return (list||[]).map(q=>({word:q.word,answers:Array.isArray(q.answers)?q.answers:[],correct:q.correct})); }
 function createPlayer(name){ return {name:String(name||"Player").slice(0,30),score:0,combo:0,maxCombo:0,correct:0,wrong:0,fastBonus:0,answerTime:0,answers:0,answered:false,connected:true,lastQuestion:-1,lastCorrect:null}; }
+
+function openProfile(){
+  document.getElementById("startScreen").classList.add("hidden");
+  document.getElementById("profileScreen").classList.remove("hidden");
+  loadMyProfile();
+}
+function closeProfile(){
+  document.getElementById("profileScreen").classList.add("hidden");
+  document.getElementById("startScreen").classList.remove("hidden");
+}
+async function loadMyProfile(){
+  const status=document.getElementById("profileStatus");
+  const box=document.getElementById("profileContent");
+  status.textContent="⏳ Profil ma’lumotlari yuklanmoqda..."; box.innerHTML="";
+  const ok=await initFirebase();
+  if(!ok||!db||!user){status.textContent="❌ Profilni yuklash uchun serverga ulanib bo‘lmadi.";return;}
+  try{
+    const snap=await db.ref("ratings").once("value");
+    const data=snap.val()||{};
+    const mine=data[uidKey()]||{};
+    const points=Number(mine.points)||0;
+    const games=Number(mine.games)||0;
+    const wins=Number(mine.wins)||0;
+    const best=Number(mine.bestScore)||0;
+    const entries=Object.keys(data).map(id=>({id,points:Number(data[id]?.points)||0})).sort((a,b)=>b.points-a.points);
+    const position=points>0?entries.findIndex(x=>x.id===uidKey())+1:"—";
+    const history=Object.values(mine.history||{}).sort((a,b)=>(Number(b.at)||0)-(Number(a.at)||0));
+    const recent=history.slice(0,5);
+    const recentHtml=recent.length?recent.map(g=>'<div class="profile-history-row"><span>'+new Date(Number(g.at)||0).toLocaleDateString("uz-UZ")+'</span><span>'+(g.won?'🏆 G‘alaba':'🎮 O‘yin')+'</span><strong>+'+(Number(g.points)||0)+' XP</strong></div>').join(''):'<div class="small">Hali o‘yinlar tarixi yo‘q. Birinchi o‘yinni boshlang!</div>';
+    const displayName=mine.name||document.getElementById("nameInput").value.trim()||"O‘yinchi";
+    box.innerHTML='<div class="status">👤 '+escapeHtml(displayName)+'<br><b>'+escapeHtml(xpTitle(points))+'</b></div>'+ 
+      '<div class="profile-grid">'+
+      '<div class="profile-stat">Jami XP<strong>'+formatXP(points)+'</strong></div>'+ 
+      '<div class="profile-stat">Reytingdagi o‘rin<strong>'+(position==='—'?'—':'#'+position)+'</strong></div>'+ 
+      '<div class="profile-stat">O‘yinlar<strong>'+games+'</strong></div>'+ 
+      '<div class="profile-stat">G‘alabalar<strong>'+wins+'</strong></div>'+ 
+      '<div class="profile-stat">G‘alaba foizi<strong>'+(games?Math.round(wins/games*100):0)+'%</strong></div>'+ 
+      '<div class="profile-stat">Eng yaxshi natija<strong>'+best+' XP</strong></div>'+ 
+      '</div><h3>🕘 Oxirgi o‘yinlar</h3><div class="profile-history">'+recentHtml+'</div>';
+    status.textContent="✅ Profil yuklandi";
+  }catch(e){console.error("Profile load error",e);status.textContent="❌ Profilni yuklashda xatolik. Qayta urinib ko‘ring.";}
+}
 
 function initFirebase(){
   if(firebaseReady) return firebaseReady;
@@ -374,7 +419,7 @@ function joinRoom(id){
     const r=s.val();
     if(!r||!r.meta||r.meta.started){alert("Bu xona mavjud emas yoki o‘yin boshlangan.");refreshRooms();return;}
     const count=Object.keys(r.players||{}).length;
-    if(count>=MAX_PLAYERS){alert("Xona to‘ldi (30/30).");return;}
+    if(count>=MAX_PLAYERS){alert("Xona to‘ldi (50/50).");return;}
     const p=createPlayer(myName);
     return roomRef.child("players").child(uidKey()).set(p).then(()=>roomRef.child("players").child(uidKey()).onDisconnect().remove()).then(()=>showWaiting(false)).then(()=>attachRoomListeners());
   }).catch(e=>{console.error(e);alert("Xonaga kirib bo‘lmadi: "+e.message);});
@@ -465,7 +510,7 @@ function renderQuestion(q){
     answered=true;
     disableAnswers();
     if(me.lastCorrect===true){
-      const correctBtn=Array.from(box.querySelectorAll(".answer")).find(b=>b.textContent===String(correctAnswerFor(currentQuestion)));
+      const correctBtn=Array.from(box.querySelectorAll(".answer")).find(b=>b.textContent===String((questions[currentQuestion]||{}).correct));
       if(correctBtn)correctBtn.classList.add("correct");
       document.getElementById("feedback").textContent="✅ To‘g‘ri! "+(me.score||0)+" ball";
     }else if(me.lastCorrect===false){
@@ -492,7 +537,7 @@ function submitAnswer(answer,btn,isTimeout){
   answered=true;disableAnswers();
   if(!isTimeout){
     window.__ftopikSelectedAnswer=answer;
-    const correctAnswer=correctAnswerFor(currentQuestion);
+    const correctAnswer=(questions[currentQuestion]||{}).correct;
     if(String(answer)===String(correctAnswer)){
       if(btn)btn.classList.add("correct");
       document.getElementById("feedback").textContent="✅ To‘g‘ri!";
@@ -654,7 +699,7 @@ function handleMyResult(p){
   }else if(p.lastCorrect===false){
     // Javob noto‘g‘ri bo‘lsa, tanlangan variant qizil qoladi,
     // serverdagi to‘g‘ri javob ma’lum bo‘lsa yashil ko‘rsatiladi.
-    const correct=correctAnswerFor(activeQuestion);
+    const correct=(questions[activeQuestion]||{}).correct;
     buttons.forEach(b=>{if(correct!=null && b.textContent===String(correct)) b.classList.add("correct");});
     feedback.textContent="❌ Noto‘g‘ri!";
   }
