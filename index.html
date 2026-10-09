@@ -105,6 +105,19 @@ button:disabled{opacity:.55;cursor:not-allowed}
 .rankup-button{background:#fff;color:#5124b8;margin-top:15px}
 @keyframes rankPop{0%{transform:scale(.65) translateY(25px);opacity:0}100%{transform:scale(1) translateY(0);opacity:1}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+/* Teacher dashboard */
+.teacher-tools{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.teacher-tools input{flex:1;min-width:180px;margin:0}
+.teacher-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.teacher-stat{background:#f7f3ff;border:1px solid #e7ddff;border-radius:12px;padding:12px;text-align:center;font-size:12px;color:#6b6280}
+.teacher-stat strong{display:block;font-size:20px;color:#673de6;margin-top:5px}
+.teacher-table-wrap{overflow-x:auto;margin-top:12px}
+.teacher-table{width:100%;border-collapse:collapse;font-size:13px;min-width:650px}
+.teacher-table th,.teacher-table td{padding:10px 8px;border-bottom:1px solid #eee;text-align:left}
+.teacher-table th{background:#f5f0ff;color:#5f35bb;position:sticky;top:0}
+.teacher-table tr:hover td{background:#fbf9ff}
+.teacher-note{font-size:12px;line-height:1.5;color:#777;background:#fff9e8;padding:11px;border-radius:10px;margin-top:12px}
 @media(max-width:560px){
   .container{padding:10px}.card{padding:17px;border-radius:19px}.logo{font-size:24px}.word{font-size:38px}.answers{grid-template-columns:1fr}.room-code{font-size:30px}.stats-grid,.profile-grid{grid-template-columns:1fr}.board-row{grid-template-columns:28px 1fr auto auto}
 }
@@ -117,6 +130,7 @@ button:disabled{opacity:.55;cursor:not-allowed}
 
   <div id="startScreen" class="card">
     <button class="secondary" onclick="openProfile()">👤 Mening profilim</button>
+    <button class="secondary" onclick="openTeacherPanel()">👨‍🏫 O‘qituvchi paneli</button>
     <h2 style="margin-top:0">🎮 O‘yinni boshlash</h2>
     <input id="nameInput" placeholder="Ismingizni kiriting" autocomplete="off">
     <label for="questionMode">🎯 Savollar soni</label>
@@ -146,6 +160,24 @@ button:disabled{opacity:.55;cursor:not-allowed}
     <div id="profileStatus" class="status">⏳ Profil yuklanmoqda...</div>
     <div id="profileContent"></div>
     <button class="secondary" onclick="closeProfile()">⬅️ Bosh sahifaga qaytish</button>
+  </div>
+
+  <div id="teacherScreen" class="card hidden">
+    <h2 style="margin-top:0;text-align:center">👨‍🏫 O‘qituvchi paneli</h2>
+    <div id="teacherStatus" class="status">O‘quvchilar ma’lumotlari yuklanadi...</div>
+    <div class="teacher-summary">
+      <div class="teacher-stat">Ro‘yxatdagi o‘quvchilar<strong id="teacherStudents">—</strong></div>
+      <div class="teacher-stat">Jami o‘yinlar<strong id="teacherGames">—</strong></div>
+      <div class="teacher-stat">Jami XP<strong id="teacherXP">—</strong></div>
+    </div>
+    <div class="teacher-tools">
+      <input id="teacherSearch" placeholder="🔎 O‘quvchi ismini qidiring" oninput="filterTeacherRows()">
+      <button class="refresh" style="width:auto;margin:0" onclick="loadTeacherPanel()">🔄 Yangilash</button>
+    </div>
+    <div id="teacherRooms" class="small" style="text-align:left"></div>
+    <div class="teacher-table-wrap" id="teacherTableWrap"></div>
+    <div class="teacher-note">Eslatma: panel hozircha Firebase’dagi mavjud reyting ma’lumotlarini ko‘rsatadi. Aniqlik foizi va javoblar statistikasi faqat bazada saqlangan bo‘lsa ko‘rinadi. PIN-kodli oynacha oddiy to‘siq xolos; haqiqiy maxfiylik uchun Firebase Database Rules orqali o‘qituvchi ruxsatini server tomonda cheklash kerak.</div>
+    <button class="secondary" onclick="closeTeacherPanel()">⬅️ Bosh sahifaga qaytish</button>
   </div>
 
   <div id="waitingScreen" class="card hidden">
@@ -309,6 +341,54 @@ async function loadMyProfile(){
       '</div><h3>🕘 Oxirgi o‘yinlar</h3><div class="profile-history">'+recentHtml+'</div>';
     status.textContent="✅ Profil yuklandi";
   }catch(e){console.error("Profile load error",e);status.textContent="❌ Profilni yuklashda xatolik. Qayta urinib ko‘ring.";}
+}
+
+// O‘qituvchi paneli uchun PIN. Saytni e’lon qilishdan oldin o‘zingiznikiga almashtiring.
+const TEACHER_PANEL_PIN = "2468";
+let teacherRowsCache = [];
+function openTeacherPanel(){
+  const pin=prompt("O‘qituvchi paneli PIN-kodini kiriting:");
+  if(pin===null)return;
+  if(pin!==TEACHER_PANEL_PIN){alert("PIN-kod noto‘g‘ri.");return;}
+  document.getElementById("startScreen").classList.add("hidden");
+  document.getElementById("profileScreen").classList.add("hidden");
+  document.getElementById("teacherScreen").classList.remove("hidden");
+  loadTeacherPanel();
+}
+function closeTeacherPanel(){
+  document.getElementById("teacherScreen").classList.add("hidden");
+  document.getElementById("startScreen").classList.remove("hidden");
+}
+async function loadTeacherPanel(){
+  const status=document.getElementById("teacherStatus");
+  const wrap=document.getElementById("teacherTableWrap");
+  status.textContent="⏳ Ma’lumotlar yuklanmoqda...";wrap.innerHTML="";
+  const ok=await initFirebase();
+  if(!ok||!db){status.textContent="❌ Firebase serveriga ulanib bo‘lmadi.";return;}
+  try{
+    const [ratingSnap,roomsSnap]=await Promise.all([db.ref("ratings").once("value"),db.ref("rooms").once("value")]);
+    const data=ratingSnap.val()||{};
+    teacherRowsCache=Object.keys(data).map(id=>{
+      const p=data[id]||{};const history=Object.values(p.history||{});
+      const games=Number(p.games)||history.length;const wins=Number(p.wins)||history.filter(g=>g&&g.won).length;
+      const last=history.reduce((m,g)=>Math.max(m,Number(g&&g.at)||0),0);
+      return {id,name:p.name||"O‘quvchi",points:Number(p.points)||0,games,wins,winRate:games?Math.round(wins/games*100):0,best:Number(p.bestScore)||0,last};
+    }).sort((a,b)=>b.points-a.points);
+    document.getElementById("teacherStudents").textContent=teacherRowsCache.length;
+    document.getElementById("teacherGames").textContent=teacherRowsCache.reduce((n,p)=>n+p.games,0);
+    document.getElementById("teacherXP").textContent=formatXP(teacherRowsCache.reduce((n,p)=>n+p.points,0));
+    const rooms=roomsSnap.val()||{};const active=Object.values(rooms).filter(r=>r&&r.meta&&r.meta.started===true);
+    const onlineCount=active.reduce((n,r)=>n+Object.values(r.players||{}).filter(p=>p&&p.connected!==false).length,0);
+    document.getElementById("teacherRooms").textContent="🎮 Hozir faol o‘yin xonalari: "+active.length+" • ulardagi o‘yinchilar: "+onlineCount;
+    filterTeacherRows();status.textContent="✅ Ma’lumotlar yangilandi. O‘quvchilar soni: "+teacherRowsCache.length;
+  }catch(e){console.error("Teacher panel error",e);status.textContent="❌ Ma’lumotlarni yuklashda xatolik. Firebase ruxsatlarini tekshiring.";}
+}
+function filterTeacherRows(){
+  const wrap=document.getElementById("teacherTableWrap");if(!wrap)return;
+  const query=(document.getElementById("teacherSearch")?.value||"").trim().toLocaleLowerCase();
+  const list=teacherRowsCache.filter(p=>p.name.toLocaleLowerCase().includes(query));
+  if(!list.length){wrap.innerHTML='<div class="empty">Mos o‘quvchi topilmadi.</div>';return;}
+  wrap.innerHTML='<table class="teacher-table"><thead><tr><th>#</th><th>O‘quvchi</th><th>Unvon</th><th>Jami XP</th><th>O‘yin</th><th>G‘alaba</th><th>G‘alaba %</th><th>Eng yaxshi</th><th>Oxirgi faollik</th></tr></thead><tbody>'+list.map(p=>'<tr><td>'+(teacherRowsCache.indexOf(p)+1)+'</td><td>'+escapeHtml(p.name)+'</td><td>'+escapeHtml(xpTitle(p.points))+'</td><td>'+formatXP(p.points)+'</td><td>'+p.games+'</td><td>'+p.wins+'</td><td>'+p.winRate+'%</td><td>'+p.best+'</td><td>'+(p.last?new Date(p.last).toLocaleDateString("uz-UZ"):"—")+'</td></tr>').join('')+'</tbody></table>';
 }
 
 function initFirebase(){
