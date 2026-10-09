@@ -515,15 +515,48 @@ function watchRooms(){
 }
 function refreshRooms(){ if(!db){initFirebase();return;} if(!roomsRef) watchRooms(); else roomsRef.once("value").then(s=>renderRooms(s.val()||{})); }
 function renderRooms(data){
-  const list=document.getElementById("roomsList"); list.innerHTML="";
-  const rooms=Object.keys(data||{}).map(k=>data[k]).filter(r=>r && r.meta && r.meta.started!==true && Number(r.meta.playersCount||0)<MAX_PLAYERS).sort((a,b)=>Number(a.meta.createdAt||0)-Number(b.meta.createdAt||0));
+  const list=document.getElementById("roomsList");
+  if(!list) return;
+  list.innerHTML="";
+
+  // Faqat hali boshlanmagan, kutish holatidagi va o‘yinchilarni qabul qila oladigan xonalar.
+  const rooms=Object.keys(data||{}).map(key=>{
+    const r=data[key];
+    return r ? {...r, _key:key} : null;
+  }).filter(r=>{
+    if(!r || !r.meta || !r.state) return false;
+    if(r.meta.started===true || r.state.phase!=="waiting") return false;
+
+    const playersObj=r.players||{};
+    const playerIds=Object.keys(playersObj).filter(id=>playersObj[id] && playersObj[id].connected!==false);
+    const limit=Number(r.meta.maxPlayers)||(r.meta.mode==="duel"?2:MAX_PLAYERS);
+
+    // Bo‘sh qolgan/eskirgan xonalarni ko‘rsatmaymiz.
+    if(!playerIds.length || !r.meta.hostUid || !playersObj[r.meta.hostUid]) return false;
+    if(playerIds.length>=limit) return false;
+
+    r._actualPlayerCount=playerIds.length;
+    r._limit=limit;
+    return true;
+  }).sort((a,b)=>Number(a.meta.createdAt||0)-Number(b.meta.createdAt||0));
+
   setRoomsStatus(rooms.length?`✅ ${rooms.length} ta ochiq xona`:"Hozircha ochiq xona yo‘q.");
-  if(!rooms.length){ list.innerHTML='<div class="empty">Hozircha ochiq xona yo‘q.</div>'; return; }
+  if(!rooms.length){
+    list.innerHTML='<div class="empty">Hozircha ochiq xona yo‘q.</div>';
+    return;
+  }
+
   rooms.forEach(r=>{
-    const id=r.meta.roomId || "";
-    const row=document.createElement("div"); row.className="room-row";
-    row.innerHTML='<div class="room-main"><div class="room-title">👤 '+escapeHtml(r.meta.hostName||"O‘qituvchi")+'</div><div class="room-meta">'+(Number(r.meta.questionCount)||10)+' savol • '+(Number(r.meta.playersCount)||1)+'/'+(Number(r.meta.maxPlayers)||MAX_PLAYERS)+' o‘yinchi • '+escapeHtml(modeLabel(r.meta.mode))+'</div></div>'; 
-    const b=document.createElement("button"); b.className="join-btn"; b.textContent="Qo‘shilish"; b.onclick=()=>joinPublicRoom(id); row.appendChild(b); list.appendChild(row);
+    const id=r.meta.roomId || r._key;
+    const row=document.createElement("div");
+    row.className="room-row";
+    row.innerHTML='<div class="room-main"><div class="room-title">👤 '+escapeHtml(r.meta.hostName||"O‘qituvchi")+'</div><div class="room-meta">'+(Number(r.meta.questionCount)||10)+' savol • '+r._actualPlayerCount+'/'+r._limit+' o‘yinchi • '+escapeHtml(modeLabel(r.meta.mode))+'</div></div>';
+    const b=document.createElement("button");
+    b.className="join-btn";
+    b.textContent="Qo‘shilish";
+    b.onclick=()=>joinPublicRoom(id);
+    row.appendChild(b);
+    list.appendChild(row);
   });
 }
 
@@ -566,7 +599,11 @@ function joinRoom(id){
   roomId=String(id).toUpperCase(); isHost=false; roomRef=db.ref(roomPath());
   roomRef.once("value").then(s=>{
     const r=s.val();
-    if(!r||!r.meta||r.meta.started){alert("Bu xona mavjud emas yoki o‘yin boshlangan.");refreshRooms();return;}
+    if(!r||!r.meta||r.meta.started||!r.state||r.state.phase!=="waiting"){
+      alert("Bu xona mavjud emas yoki o‘yin boshlangan.");
+      refreshRooms();
+      return;
+    }
     const count=Object.keys(r.players||{}).length;
     const mode=r.meta.mode||"open";const limit=Number(r.meta.maxPlayers)||(mode==="duel"?2:MAX_PLAYERS);
     if(count>=limit){alert("Xona to‘ldi ("+limit+"/"+limit+").");return;}
