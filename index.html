@@ -11,6 +11,7 @@
 <script src="firebase-config.js?v=20261010"></script>
 <script src="questions.js?v=20261010"></script>
 <script src="grammars.js?v=20261010"></script>
+<script src="topik30days.js?v=20261013"></script>
 
 <style>
 *{box-sizing:border-box}
@@ -138,6 +139,7 @@ button:disabled{opacity:.55;cursor:not-allowed}
     <select id="testType">
       <option value="vocab">📖 TOPIK II lug‘ati</option>
       <option value="grammar">✍️ TOPIK II grammatikasi</option>
+      <option value="topik30days">📘 TOPIK II 30 Days</option>
     </select>
     <div class="small">TOPIK II grammatikasida gapni to‘ldirish uchun to‘g‘ri grammatikani tanlang.</div>
     <label for="battleMode">⚔️ O‘yin rejimi</label>
@@ -344,6 +346,29 @@ function generateQuestions(count){
         word: item.meaning,
         answers,
         correct: item.grammar
+      };
+    });
+  }
+
+  if(type === "topik30days"){
+    const bank = Array.isArray(window.topik30DaysBank) ? window.topik30DaysBank :
+      (Array.isArray(window.topik30daysBank) ? window.topik30daysBank : []);
+    const usable = bank.filter(item =>
+      item && typeof item.korean === "string" && item.korean.trim() &&
+      typeof item.uzbek === "string" && item.uzbek.trim()
+    );
+    if(!usable.length) return [];
+    const n = Math.min(Number(count) || 10, usable.length);
+    return [...usable].sort(() => Math.random() - 0.5).slice(0, n).map(item => {
+      const wrong = usable
+        .filter(x => x.uzbek !== item.uzbek)
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 3)
+        .map(x => x.uzbek);
+      return {
+        word: item.korean,
+        answers: [item.uzbek, ...wrong].sort(() => Math.random() - 0.5),
+        correct: item.uzbek
       };
     });
   }
@@ -676,7 +701,14 @@ function startGame(){
   if(mode==="team"&&countNow<4){alert("Team Battle uchun kamida 4 o‘yinchi tavsiya etiladi.");return;}
   if(mode==="boss")questionCount=30;
   testType=document.getElementById("testType")?.value||testType||"vocab";
-  const qs=generateQuestions(questionCount); if(qs.length!==questionCount){alert(testType==="grammar"?"grammars.js faylida yetarli grammatika savollari yo‘q. Kamida "+questionCount+" ta savol kiriting.":"Savollarni yaratib bo‘lmadi.");return;}
+  const qs=generateQuestions(questionCount); if(qs.length!==questionCount){
+    const message = testType==="grammar"
+      ? "grammars.js faylida yetarli grammatika savollari yo‘q. Kamida "+questionCount+" ta savol kiriting."
+      : testType==="topik30days"
+        ? "topik30days.js faylida yetarli lug‘at yo‘q yoki fayl yuklanmagan. Kamida "+questionCount+" ta lug‘at kerak."
+        : "Savollarni yaratib bo‘lmadi.";
+    alert(message);return;
+  }
   const resetPlayers={}; Object.keys(players).forEach(id=>{ const p=Object.assign(createPlayer(players[id].name),players[id]); p.score=0;p.combo=0;p.maxCombo=0;p.correct=0;p.wrong=0;p.fastBonus=0;p.answerTime=0;p.answers=0;p.answered=false;p.connected=true;p.lastQuestion=-1;p.lastCorrect=null; resetPlayers[id]=p; });
   const d=serverNow()+(mode==="boss"?10:GAME_TIME)*1000;
   const state={phase:"game",currentQuestion:0,questionCount,mode,testType,deadline:d,questions:publicQuestions(qs),revealQuestion:-1,revealCorrect:null};
@@ -690,7 +722,7 @@ function renderQuestion(q){
   if(!q)return;
   window.__ftopikSelectedAnswer=undefined;
   answered=false;
-  document.getElementById("questionNumber").textContent=(currentQuestion+1)+" / "+questionCount+(currentState?.mode?" · "+modeLabel(currentState.mode):"")+(currentState?.testType==="grammar"?" · TOPIK II grammatika":"");
+  document.getElementById("questionNumber").textContent=(currentQuestion+1)+" / "+questionCount+(currentState?.mode?" · "+modeLabel(currentState.mode):"")+(currentState?.testType==="grammar"?" · TOPIK II grammatika":currentState?.testType==="topik30days"?" · TOPIK II 30 Days":"");
   document.getElementById("word").textContent=q.word;
   document.getElementById("feedback").textContent="";
   const box=document.getElementById("answers");
