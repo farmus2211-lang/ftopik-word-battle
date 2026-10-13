@@ -632,6 +632,9 @@ function updateMetaCount(){
 function handleState(state){
   if(!state||!state.phase)return;
   questionCount=Number(state.questionCount)||questionCount;
+  // Host savollarni Firebase state ichida yuboradi; har bir qatnashchi
+  // javobni tekshirish uchun shu umumiy savollar ro‘yxatini yuklab olishi kerak.
+  if(Array.isArray(state.questions)) questions=state.questions;
   if(state.phase==="waiting"){ showWaiting(isHost); return; }
   if(state.phase==="game"){
     const q=Number(state.currentQuestion)||0;
