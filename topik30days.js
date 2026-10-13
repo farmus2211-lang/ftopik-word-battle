@@ -133,4 +133,5 @@ window.topik30DaysBank = [
   { korean: "용기가 나다", uzbek: "jurat qilmoq" },
   { korean: "감소하다", uzbek: "pasaymoq" },
   { korean: "증가하다", uzbek: "o’smoq" },
-  { korean: "게다가", uzbek: "더구나 – shu bilan birga" },
+  { korean: "게다가", uzbek: "더구나 – shu bilan birga" }
+];
