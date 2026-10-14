@@ -61,6 +61,8 @@ button:disabled{opacity:.55;cursor:not-allowed}
 .answer.wrong{background:#e74c3c;color:#fff;border-color:#e74c3c}
 .feedback{text-align:center;min-height:30px;font-weight:900;margin:6px 0}
 .players{margin-top:17px}
+.team-manager{margin:14px 0;padding:14px;border:1px solid #ddd6fe;border-radius:14px;background:#faf8ff;text-align:left}
+.team-name-row{display:flex;gap:10px;margin:8px 0}.team-name-row input{min-width:0;flex:1;margin:0}.team-columns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.team-column{padding:10px;border-radius:12px;background:#fff;border:1px solid #e5e7eb}.team-column h3{margin:0 0 8px;font-size:15px}.team-member{display:flex;gap:6px;align-items:center;justify-content:space-between;padding:7px 0;border-top:1px solid #eee;font-size:13px}.team-member select{max-width:95px;padding:6px;margin:0}.team-chip{display:inline-block;padding:3px 7px;border-radius:9px;background:#ede9fe;color:#5b21b6;font-size:11px;font-weight:800}.team-chip.b{background:#fee2e2;color:#991b1b}@media(max-width:520px){.team-columns{grid-template-columns:1fr}.team-name-row{flex-direction:column}}
 .board-title{font-weight:900;margin-bottom:6px}
 .board{display:grid;gap:6px;max-height:390px;overflow:auto}
 .board-row{display:grid;grid-template-columns:33px 1fr auto auto;gap:8px;align-items:center;padding:8px 10px;border-radius:11px;background:#faf9ff;border:1px solid #ece7fb}
@@ -202,6 +204,7 @@ button:disabled{opacity:.55;cursor:not-allowed}
     <div id="roomCode" class="room-code">------</div>
     <div id="waitingStatus" class="status">⏳ O‘yinchilar kutilmoqda...</div>
     <div id="waitingPlayers" class="wait-list"></div>
+    <div id="teamManager" class="team-manager hidden"></div>
     <button id="startBtn" onclick="startGame()" disabled>▶️ O‘yinni boshlash</button>
     <button class="secondary" onclick="copyRoomCode()">📋 Kodni nusxalash</button>
     <div id="connectionLine" class="connection-line"></div>
@@ -280,6 +283,7 @@ let testType = "vocab";
 let questions = [];
 let currentState = null;
 let players = {};
+let teamNames = {A:"TEAM TIGERS",B:"TEAM DRAGONS"};
 let currentQuestion = 0;
 let deadline = 0;
 let answered = false;
@@ -598,7 +602,7 @@ function createRoom(){
   roomRef=db.ref(roomPath());
   const p=createPlayer(myName); p.team=battleMode==="team"?"A":null; players={}; players[uidKey()]=p;
   const roomLimit=battleMode==="duel"?2:MAX_PLAYERS;
-  const meta={roomId,hostUid:uidKey(),hostName:safeName(),questionCount,mode:battleMode,testType,maxPlayers:roomLimit,playersCount:1,started:false,createdAt:firebase.database.ServerValue.TIMESTAMP};
+  const meta={roomId,hostUid:uidKey(),hostName:safeName(),questionCount,mode:battleMode,testType,maxPlayers:roomLimit,playersCount:1,started:false,teamNames:{A:"TEAM TIGERS",B:"TEAM DRAGONS"},createdAt:firebase.database.ServerValue.TIMESTAMP};
   roomRef.set({meta:meta,players:{[uidKey()]:p},state:{phase:"waiting",currentQuestion:0,questionCount,deadline:0}}).then(()=>{
     roomRef.child("meta").onDisconnect().remove();
     roomRef.child("players").child(uidKey()).onDisconnect().remove();
@@ -645,6 +649,7 @@ function attachRoomListeners(){
   listenersAttached=true;
   playersRef=roomRef.child("players"); stateRef=roomRef.child("state"); myPlayerRef=playersRef.child(uidKey());
   playersRef.on("value",s=>{players=s.val()||{}; updateMetaCount(); renderWaitingPlayers(); renderBoard(); updateMyBadge(); maybeHostAdvance();});
+  roomRef.child("meta/teamNames").on("value",s=>{teamNames=Object.assign({A:"TEAM TIGERS",B:"TEAM DRAGONS"},s.val()||{});renderWaitingPlayers();renderBoard();});
   stateRef.on("value",s=>{currentState=s.val()||{}; handleState(currentState);});
   myPlayerRef.on("value",s=>{const p=s.val();if(!p)return; players[uidKey()]=p; renderBoard(); updateMyBadge(); handleMyResult(p);});
   roomRef.child("answers/"+currentQuestion).on("child_added",()=>{ if(isHost) processCurrentAnswers(false); });
@@ -689,16 +694,38 @@ function showWaiting(host){
 function renderWaitingPlayers(){
   const box=document.getElementById("waitingPlayers"); if(!box)return;
   const list=Object.keys(players||{}).map(id=>({id,...players[id]})).filter(p=>p.connected!==false);
-  box.innerHTML=list.map((p,i)=>'<div class="wait-player"><b>'+(i===0?'👑 ':'👤 ')+escapeHtml(p.name)+'</b><span class="tag">'+(i===0?'Host':'O‘yinchi')+'</span></div>').join("");
+  const mode=battleMode||currentState?.mode||"open";
+  if(mode==="team"){
+    const a=list.filter(p=>p.team==="A"), b=list.filter(p=>p.team==="B");
+    box.innerHTML='<div class="team-columns"><div class="team-column"><h3>🔵 '+escapeHtml(teamNames.A)+' ('+a.length+')</h3>'+a.map(p=>'<div class="team-member"><span>'+(p.id===uidKey()?'⭐ ':'👤 ')+escapeHtml(p.name)+(p.id===uidKey()?' (siz)':'')+'</span>'+(isHost&&currentState?.phase!=="game"?'<select aria-label="Jamoa" onchange="movePlayerTeam(\''+p.id+'\',this.value)"><option value="A" '+(p.team==="A"?'selected':'')+'>A jamoa</option><option value="B" '+(p.team==="B"?'selected':'')+'>B jamoa</option></select>':'<span class="team-chip">A</span>')+'</div>').join('')+'</div><div class="team-column"><h3>🔴 '+escapeHtml(teamNames.B)+' ('+b.length+')</h3>'+b.map(p=>'<div class="team-member"><span>'+(p.id===uidKey()?'⭐ ':'👤 ')+escapeHtml(p.name)+(p.id===uidKey()?' (siz)':'')+'</span>'+(isHost&&currentState?.phase!=="game"?'<select aria-label="Jamoa" onchange="movePlayerTeam(\''+p.id+'\',this.value)"><option value="A" '+(p.team==="A"?'selected':'')+'>A jamoa</option><option value="B" '+(p.team==="B"?'selected':'')+'>B jamoa</option></select>':'<span class="team-chip b">B</span>')+'</div>').join('')+'</div></div>';
+    const manager=document.getElementById("teamManager");
+    if(manager){manager.classList.remove("hidden");manager.innerHTML=isHost&&currentState?.phase!=="game"?'<b>⚙️ Jamoalarni boshqarish</b><div class="team-name-row"><input id="teamNameA" maxlength="24" value="'+escapeHtml(teamNames.A)+'" aria-label="A jamoa nomi"><input id="teamNameB" maxlength="24" value="'+escapeHtml(teamNames.B)+'" aria-label="B jamoa nomi"></div><button class="secondary" onclick="saveTeamNames()">💾 Jamoa nomlarini saqlash</button><button class="secondary" onclick="balanceTeams()">⚖️ Teng taqsimlash</button><div class="small">O‘yin boshlanishidan oldin tarkibni o‘zgartiring.</div>':'<b>🔵 '+escapeHtml(teamNames.A)+' · 🔴 '+escapeHtml(teamNames.B)+'</b>';}
+  }else{box.innerHTML=list.map((p,i)=>'<div class="wait-player"><b>'+(i===0?'👑 ':'👤 ')+escapeHtml(p.name)+'</b><span class="tag">'+(i===0?'Host':'O‘yinchi')+'</span></div>').join("");document.getElementById("teamManager")?.classList.add("hidden");}
   const start=document.getElementById("startBtn");
   if(isHost){ start.classList.remove("hidden"); start.disabled=list.length<2; document.getElementById("waitingStatus").textContent=list.length>=2?`✅ ${list.length} o‘yinchi tayyor. Boshlash mumkin!`:`⏳ Kamida 2 o‘yinchi kerak.`; }
+}
+function saveTeamNames(){
+  if(!isHost||!roomRef||currentState?.phase==="game"){alert("Jamoa nomini faqat o‘yin boshlanishidan oldin xona egasi o‘zgartiradi.");return;}
+  const A=(document.getElementById("teamNameA")?.value||"TEAM TIGERS").trim().slice(0,24)||"TEAM TIGERS";
+  const B=(document.getElementById("teamNameB")?.value||"TEAM DRAGONS").trim().slice(0,24)||"TEAM DRAGONS";
+  roomRef.child("meta/teamNames").set({A,B}).then(()=>{teamNames={A,B};renderWaitingPlayers();}).catch(e=>alert("Jamoa nomini saqlab bo‘lmadi: "+e.message));
+}
+function movePlayerTeam(id,team){
+  if(!isHost||!roomRef||currentState?.phase==="game"||!players[id]||!["A","B"].includes(team))return;
+  roomRef.child("players/"+id+"/team").set(team).catch(e=>alert("Jamoani o‘zgartirib bo‘lmadi: "+e.message));
+}
+function balanceTeams(){
+  if(!isHost||!roomRef||currentState?.phase==="game")return;
+  const ids=Object.keys(players||{}).filter(id=>players[id]&&players[id].connected!==false);
+  const updates={};ids.forEach((id,i)=>updates[id+"/team"]=i%2===0?"A":"B");
+  roomRef.child("players").update(updates).catch(e=>alert("Jamoalarni taqsimlab bo‘lmadi: "+e.message));
 }
 function startGame(){
   if(!isHost||!roomRef||Object.keys(players).length<2)return;
   const mode=battleMode||document.getElementById("battleMode")?.value||"open";
   const countNow=Object.keys(players).length;
   if(mode==="duel"&&countNow!==2){alert("1 vs 1 rejimi uchun aynan 2 o‘yinchi kerak.");return;}
-  if(mode==="team"&&countNow<4){alert("Team Battle uchun kamida 4 o‘yinchi tavsiya etiladi.");return;}
+  if(mode==="team"&&countNow<2){alert("Team Battle uchun kamida 2 o‘yinchi kerak.");return;}
   if(mode==="boss")questionCount=30;
   testType=document.getElementById("testType")?.value||testType||"vocab";
   const qs=generateQuestions(questionCount); if(qs.length!==questionCount){
@@ -950,12 +977,15 @@ function rematchGame(){
   const resetPlayers={};
   activeIds.forEach(function(id){
     const old=players[id]||{};
-    resetPlayers[id]=createPlayer(old.name||"Player");
+    const fresh=createPlayer(old.name||"Player");
+    if((battleMode||currentState?.mode)==="team") fresh.team=old.team||"A";
+    resetPlayers[id]=fresh;
   });
-  const d=serverNow()+GAME_TIME*1000;
-  const state={phase:"game",currentQuestion:0,questionCount:questionCount,deadline:d,questions:publicQuestions(qs),revealQuestion:-1,revealCorrect:null,rematch:true};
+  const mode=battleMode||currentState?.mode||"open";
+  const d=serverNow()+(mode==="boss"?10:GAME_TIME)*1000;
+  const state={phase:"game",currentQuestion:0,questionCount:questionCount,mode:mode,testType:testType,deadline:d,questions:publicQuestions(qs),revealQuestion:-1,revealCorrect:null,rematch:true};
   roomRef.update({
-    meta:{roomId,hostUid:uidKey(),hostName:safeName(),questionCount,maxPlayers:MAX_PLAYERS,playersCount:activeIds.length,started:true,createdAt:firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP},
+    meta:{roomId,hostUid:uidKey(),hostName:safeName(),questionCount,mode:mode,testType,maxPlayers:mode==="duel"?2:MAX_PLAYERS,playersCount:activeIds.length,started:true,createdAt:firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP},
     players:resetPlayers,state:state,answers:{}
   }).then(function(){
     players=resetPlayers; questions=qs; currentQuestion=0; currentState=state; deadline=d;
@@ -1086,9 +1116,18 @@ function loadGlobalRating(){
 
 function showResultFromState(state){
   document.getElementById("gameScreen").classList.add("hidden");document.getElementById("waitingScreen").classList.add("hidden");document.getElementById("resultScreen").classList.remove("hidden");
-  const list=(state.results||[]); if(!list.length)return; const mode=state.mode||battleMode||"open"; if(mode==="team"){const totals={A:0,B:0};list.forEach(p=>{const team=(players[p.uid]||{}).team;if(team)totals[team]+=Number(p.score)||0;});document.getElementById("winner").textContent=totals.A===totals.B?"🤝 Jamoalar durang!":(totals.A>totals.B?"🏆 🔵 A jamoa g‘olib!":"🏆 🔴 B jamoa g‘olib!");document.getElementById("winnerSub").textContent="🔵 A jamoa: "+totals.A+" ball · 🔴 B jamoa: "+totals.B+" ball";}else if(mode==="boss"){document.getElementById("winnerSub").textContent="👑 Boss Battle yakunlandi! Eng yuqori ball g‘olib bo‘ldi.";} const top=Number(list[0].score)||0;const tie=list.filter(p=>Number(p.score||0)===top).length>1;
+  const list=(state.results||[]); if(!list.length)return; const mode=state.mode||battleMode||"open"; const top=Number(list[0].score)||0; const tie=list.filter(p=>Number(p.score||0)===top).length>1;
   const rematchBtn=document.getElementById("rematchBtn"); const rematchInfo=document.getElementById("rematchInfo"); if(rematchBtn) rematchBtn.classList.toggle("hidden",!isHost); if(rematchInfo) rematchInfo.classList.toggle("hidden",isHost);
-  document.getElementById("trophy").textContent=tie?'🤝':'🏆';document.getElementById("winner").textContent=tie?'🤝 Durrang!':'🏆 '+list[0].name+' g‘olib!';document.getElementById("winnerSub").textContent=tie?'Teng natija.':'Ajoyib natija! 🎉';
+  if(mode==="team"){
+    const totals={A:0,B:0}; list.forEach(p=>{const team=(players[p.uid]||{}).team;if(team)totals[team]+=Number(p.score)||0;});
+    document.getElementById("trophy").textContent=totals.A===totals.B?'🤝':'🏆';
+    document.getElementById("winner").textContent=totals.A===totals.B?'🤝 Jamoalar durang!':(totals.A>totals.B?'🏆 🔵 '+teamNames.A+' g‘olib!':'🏆 🔴 '+teamNames.B+' g‘olib!');
+    document.getElementById("winnerSub").textContent="🔵 "+teamNames.A+": "+totals.A+" ball · 🔴 "+teamNames.B+": "+totals.B+" ball";
+  } else {
+    document.getElementById("trophy").textContent=tie?'🤝':'🏆';
+    document.getElementById("winner").textContent=tie?'🤝 Durrang!':'🏆 '+list[0].name+' g‘olib!';
+    document.getElementById("winnerSub").textContent=mode==="boss"?'👑 Boss Battle yakunlandi! Eng yuqori ball g‘olib bo‘ldi.':(tie?'Teng natija.':'Ajoyib natija! 🎉');
+  }
   renderPodium(list);
   renderMyRankProgress(Number((rankCache[uidKey()]||{}).points)||0);
   if(db&&uidKey())db.ref('ratings/'+uidKey()+'/points').once('value').then(s=>renderMyRankProgress(Number(s.val())||0)).catch(()=>{});
