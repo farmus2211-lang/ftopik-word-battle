@@ -11,7 +11,7 @@
 <script src="firebase-config.js?v=20261010"></script>
 <script src="questions.js?v=20261010"></script>
 <script src="grammars.js?v=20261010"></script>
-<script src="topik30days.js?v=20261013"></script>
+<script src="topik30days.js?v=20261014-2"></script>
 
 <style>
 *{box-sizing:border-box}
@@ -713,7 +713,9 @@ function startGame(){
   const d=serverNow()+(mode==="boss"?10:GAME_TIME)*1000;
   const state={phase:"game",currentQuestion:0,questionCount,mode,testType,deadline:d,questions:publicQuestions(qs),revealQuestion:-1,revealCorrect:null};
   const roomLimit=mode==="duel"?2:MAX_PLAYERS;
-  roomRef.update({meta:{roomId,hostUid:uidKey(),hostName:safeName(),questionCount,mode,testType,maxPlayers:roomLimit,playersCount:Object.keys(players).length,started:true,createdAt:firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP},players:resetPlayers,state:state,answers:{}}).then(()=>{questions=qs;});
+  roomRef.update({meta:{roomId,hostUid:uidKey(),hostName:safeName(),questionCount,mode,testType,maxPlayers:roomLimit,playersCount:Object.keys(players).length,started:true,createdAt:firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP},players:resetPlayers,state:state,answers:{}})
+    .then(()=>{questions=qs;})
+    .catch(e=>{console.error("startGame Firebase update error:",e);alert("O‘yin boshlanmadi: "+(e.message||"Firebase xatosi")+"\\nFirebase Database Rules va internet ulanishini tekshiring.");});
 }
 function showGame(){
   document.getElementById("startScreen").classList.add("hidden");document.getElementById("waitingScreen").classList.add("hidden");document.getElementById("resultScreen").classList.add("hidden");document.getElementById("gameScreen").classList.remove("hidden");
@@ -1099,7 +1101,10 @@ function showResultFromState(state){
 function launchConfetti(){const symbols=['🎉','✨','🎊','💜','⭐'];for(let i=0;i<30;i++){const d=document.createElement("div");d.className="confetti";d.textContent=symbols[Math.floor(Math.random()*symbols.length)];d.style.left=(Math.random()*100)+"vw";d.style.animationDelay=(Math.random()*.8)+"s";document.body.appendChild(d);setTimeout(()=>d.remove(),3600);}}
 function copyRoomCode(){if(navigator.clipboard)navigator.clipboard.writeText(roomId);else prompt("Xona kodi:",roomId);}
 
-window.addEventListener("load",initFirebase);
+window.addEventListener("load",()=>{
+  console.info("[F-TOPIK] TOPIK II 30 Days bank:", Array.isArray(window.topik30DaysBank) ? window.topik30DaysBank.length : "YUKLANMAGAN");
+  initFirebase();
+});
 </script>
 </body>
 </html>
