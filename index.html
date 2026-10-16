@@ -548,6 +548,20 @@ function renderRooms(data){
   if(!list) return;
   list.innerHTML="";
 
+  // Eskirgan / egasi yo‘q kutish xonalarini Firebase'dan tozalash.
+  // 2 soatdan eski xonalar yoki host o‘yinchisi yo‘q xonalar endi ro‘yxatda qolmaydi.
+  const now=Date.now();
+  Object.keys(data||{}).forEach(key=>{
+    const r=data[key];
+    if(!r || !r.meta || !r.state) return;
+    const hostId=r.meta.hostUid;
+    const hostMissing=!hostId || !r.players || !r.players[hostId];
+    const created=Number(r.meta.createdAt||0);
+    const stale=created>0 && created<now-2*60*60*1000;
+    if(r.state.phase==="waiting" && (hostMissing || stale) && db){
+      db.ref("rooms/"+key).remove().catch(()=>{});
+    }
+  });
   // Faqat hali boshlanmagan, kutish holatidagi va o‘yinchilarni qabul qila oladigan xonalar.
   const rooms=Object.keys(data||{}).map(key=>{
     const r=data[key];
@@ -589,27 +603,57 @@ function renderRooms(data){
   });
 }
 
+let creatingRoom = false;
 function createRoom(){
+  // Ikki marta bosish yoki sekin internet sababli takroriy xona ochilishining oldini oladi.
+  if(creatingRoom || (roomRef && currentState && currentState.phase==="waiting")){
+    if(creatingRoom) return;
+    alert("Sizda allaqachon kutish xonasi ochiq.");
+    return;
+  }
+  const createBtn = document.querySelector('button[onclick="createRoom()"]');
+  creatingRoom = true;
+  if(createBtn){ createBtn.disabled=true; createBtn.dataset.oldText=createBtn.textContent; createBtn.textContent="⏳ Xona yaratilmoqda..."; }
   myName=document.getElementById("nameInput").value.trim();
   questionCount=Number(document.getElementById("questionMode").value)||10;
   battleMode=document.getElementById("battleMode")?.value||"open";
   testType=document.getElementById("testType")?.value||"vocab";
   if(battleMode==="boss")questionCount=30;
-  if(!myName){alert("Avval ismingizni kiriting!");return;}
-  ensureFirebaseReady().then(function(ok){
-    if(!ok) return;
-    roomId=randomRoomId(); isHost=true;
-  roomRef=db.ref(roomPath());
-  const p=createPlayer(myName); p.team=battleMode==="team"?"A":null; players={}; players[uidKey()]=p;
-  const roomLimit=battleMode==="duel"?2:MAX_PLAYERS;
-  const meta={roomId,hostUid:uidKey(),hostName:safeName(),questionCount,mode:battleMode,testType,maxPlayers:roomLimit,playersCount:1,started:false,teamNames:{A:"TEAM TIGERS",B:"TEAM DRAGONS"},createdAt:firebase.database.ServerValue.TIMESTAMP};
-  roomRef.set({meta:meta,players:{[uidKey()]:p},state:{phase:"waiting",currentQuestion:0,questionCount,deadline:0}}).then(()=>{
-    roomRef.child("meta").onDisconnect().remove();
-    roomRef.child("players").child(uidKey()).onDisconnect().remove();
-    showWaiting(true);
-    attachRoomListeners();
-  }).catch(e=>{console.error(e);alert("Xona yaratilmadi: "+e.message);});
-  });
+  if(!myName){alert("Avval ismingizni kiriting!"); resetCreateRoomButton(); return;}
+  ensureFirebaseReady().then(async function(ok){
+    if(!ok) { resetCreateRoomButton(); return; }
+    try {
+      // Shu foydalanuvchining oldingi kutish xonasi bo‘lsa, yangisini yaratmay o‘shanga qaytadi.
+      const snap=await db.ref("rooms").once("value");
+      const all=snap.val()||{};
+      const existing=Object.keys(all).map(k=>all[k]).find(r=>
+        r && r.meta && r.state && r.meta.hostUid===uidKey() &&
+        r.meta.started!==true && r.state.phase==="waiting" &&
+        r.players && r.players[uidKey()] && Number(r.meta.createdAt||0)>Date.now()-2*60*60*1000
+      );
+      if(existing){
+        roomId=String(existing.meta.roomId); isHost=true; roomRef=db.ref(roomPath());
+        showWaiting(true); attachRoomListeners(); resetCreateRoomButton(); return;
+      }
+      roomId=randomRoomId(); isHost=true;
+      roomRef=db.ref(roomPath());
+      const p=createPlayer(myName); p.team=battleMode==="team"?"A":null; players={}; players[uidKey()]=p;
+      const roomLimit=battleMode==="duel"?2:MAX_PLAYERS;
+      const meta={roomId,hostUid:uidKey(),hostName:safeName(),questionCount,mode:battleMode,testType,maxPlayers:roomLimit,playersCount:1,started:false,teamNames:{A:"TEAM TIGERS",B:"TEAM DRAGONS"},createdAt:firebase.database.ServerValue.TIMESTAMP};
+      await roomRef.set({meta:meta,players:{[uidKey()]:p},state:{phase:"waiting",currentQuestion:0,questionCount,deadline:0}});
+      // Host uzilib qolsa butun xona o‘chadi, faqat meta emas.
+      await roomRef.onDisconnect().remove();
+      roomRef.child("players").child(uidKey()).onDisconnect().remove();
+      showWaiting(true); attachRoomListeners();
+    } catch(e) {
+      console.error(e); alert("Xona yaratilmadi: "+(e.message||e));
+    } finally { resetCreateRoomButton(); }
+  }).catch(e=>{console.error(e);alert("Firebase xatosi: "+(e.message||e));resetCreateRoomButton();});
+}
+function resetCreateRoomButton(){
+  creatingRoom=false;
+  const b=document.querySelector('button[onclick="createRoom()"]');
+  if(b){b.disabled=false;b.textContent=b.dataset.oldText||"🏠 Xona yaratish";}
 }
 
 function joinByCode(){
