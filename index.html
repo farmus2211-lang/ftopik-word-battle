@@ -837,6 +837,11 @@ async function processOwnXPStake(state){
   if(!(xb.participants||[]).includes(uidKey()))return;
   xpStakeBusy=true;const stake=Math.max(0,Number(xb.stake)||0);const ref=db.ref("ratings/"+uidKey());let outcome="",balance=null,detail="";
   try{
+    // Load the server balance first. If the local Firebase cache is empty,
+    // a transaction callback may receive null and abort before fetching server data.
+    const initialSnap=await ref.once("value");
+    const initialData=initialSnap.val()||{};
+    balance=Number(initialData.points)||0;
     const tx=await ref.transaction(old=>{
       old=old||{};old.xpWagers=old.xpWagers||{};const prev=old.xpWagers[roomId];
       if(prev&&prev.startedAt===xb.startedAt){outcome=prev.status;balance=Number(old.points)||0;return old;}
