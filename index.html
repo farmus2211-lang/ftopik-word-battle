@@ -843,9 +843,6 @@ async function processOwnXPStake(state){
     const initialData=initialSnap.val()||{};
     balance=Number(initialData.points)||0;
     const tx=await ref.transaction(old=>{
-      // If transaction callback receives null despite the just-read snapshot,
-      // seed it from the fetched rating record rather than falsely treating XP as 0.
-      if(old===null && initialSnap.exists()) old=JSON.parse(JSON.stringify(initialData));
       old=old||{};old.xpWagers=old.xpWagers||{};const prev=old.xpWagers[roomId];
       if(prev&&prev.startedAt===xb.startedAt){outcome=prev.status;balance=Number(old.points)||0;return old;}
       const points=Number(old.points)||0;balance=points;
@@ -862,7 +859,7 @@ async function processOwnXPStake(state){
     }else{
       xpStakeHandled=id;detail=outcome==="insufficient"?"XP yetarli emas":"XP tranzaksiyasi bajarilmadi";
       await roomRef.child("state/xpBattle/acks/"+uidKey()).set({ok:false,status:outcome||"error",name:safeName(),balance,stake,message:detail,at:Date.now()});
-      alert(outcome==="insufficient"?"XP yetarli emas. Sizda: "+(balance??0)+" XP, kerak: "+stake+" XP.\nHisob: "+(initialData.name||safeName())+"\nUID: "+uidKey()+"\nFirebase manzili: ratings/"+uidKey():"XP tikilmadi. Firebase xatosi yoki tranzaksiya bajarilmadi. Balans: "+(balance??"noma’lum")+" XP.\nUID: "+uidKey()+"\nFirebase manzili: ratings/"+uidKey());
+      alert(outcome==="insufficient"?"XP yetarli emas. Sizda: "+(balance??0)+" XP, kerak: "+stake+" XP.":"XP tikilmadi. Firebase xatosi yoki tranzaksiya bajarilmadi. Balans: "+(balance??"noma’lum")+" XP.");
     }
   }catch(e){console.error("XP stake transaction error",e);xpStakeHandled=id;detail=(e&&e.code?e.code+": ":"")+(e.message||"noma’lum xato");await roomRef.child("state/xpBattle/acks/"+uidKey()).set({ok:false,status:"error",name:safeName(),stake,message:detail,at:Date.now()}).catch(()=>{});alert("XP tikishda xatolik: "+detail);}
   finally{xpStakeBusy=false;}
@@ -1227,9 +1224,32 @@ async function settleXPBattle(state,list){
     if(totals.A===totals.B){list.forEach(p=>awards[p.uid]=stake);}
     else{const win=totals.A>totals.B?"A":"B",lose=win==="A"?"B":"A";const winners=list.filter(p=>(players[p.uid]||{}).team===win),losers=list.filter(p=>(players[p.uid]||{}).team===lose);const a=Math.floor(pot*.75),b=pot-a;winners.forEach((p,i)=>awards[p.uid]=Math.floor(a/Math.max(1,winners.length))+(i===0?a%Math.max(1,winners.length):0));losers.forEach((p,i)=>awards[p.uid]=Math.floor(b/Math.max(1,losers.length))+(i===0?b%Math.max(1,losers.length):0));}
   }else{
-    const sorted=[...list].sort((a,b)=>Number(b.score||0)-Number(a.score||0)||Number(b.maxCombo||0)-Number(a.maxCombo||0));
-    if(sorted[0]&&sorted[1]&&Number(sorted[0].score||0)===Number(sorted[1].score||0)){list.forEach(p=>awards[p.uid]=stake);}
-    else{if(sorted[0])awards[sorted[0].uid]=Math.floor(pot*.75);if(sorted[1])awards[sorted[1].uid]=Math.floor(pot*.25);const rem=pot-Object.values(awards).reduce((a,b)=>a+b,0);if(sorted[0])awards[sorted[0].uid]+=rem;}
+    // Mukofotlar qatnashchilar soniga qarab: 2 = 100/0; 3 = 75/25/0;
+    // 4 = 60/40/0/0. Teng ball olganlar teng o'rinni egallaydi va
+    // shu o'rinlarga tegishli mukofot foizlari ular orasida teng bo'linadi.
+    const sorted=[...list].sort((a,b)=>Number(b.score||0)-Number(a.score||0));
+    const shares=sorted.length<=2?[1,0]:sorted.length===3?[0.75,0.25,0]:[0.60,0.40,0,0];
+    let rank=0;
+    while(rank<sorted.length){
+      let end=rank+1;
+      while(end<sorted.length&&Number(sorted[end].score||0)===Number(sorted[rank].score||0))end++;
+      let groupShare=0;
+      for(let slot=rank;slot<end;slot++)groupShare+=shares[slot]||0;
+      const group=sorted.slice(rank,end);
+      const groupTotal=Math.floor(pot*groupShare);
+      const each=Math.floor(groupTotal/group.length);
+      let remainder=groupTotal-each*group.length;
+      group.forEach(p=>{awards[p.uid]=each+(remainder-->0?1:0);});
+      rank=end;
+    }
+    // Any rounding remainder is assigned to the highest-ranked player(s),
+    // so the whole pot is distributed without creating or losing XP.
+    const distributed=Object.values(awards).reduce((a,b)=>a+b,0);
+    const remainder=pot-distributed;
+    if(remainder>0&&sorted.length){
+      const topScore=Number(sorted[0].score||0);
+      sorted.filter(p=>Number(p.score||0)===topScore).forEach((p,i,top)=>{if(i<remainder)awards[p.uid]=(awards[p.uid]||0)+1;});
+    }
   }
   const amount=Number(awards[uidKey()]||0);const ref=db.ref("ratings/"+uidKey());
   await ref.transaction(old=>{old=old||{};old.xpWagers=old.xpWagers||{};const w=old.xpWagers[roomId];if(!w||w.startedAt!==state.xpBattle.startedAt||w.status!=="staked")return old;old.points=(Number(old.points)||0)+amount;w.status="paid";w.payout=amount;w.paidAt=Date.now();old.updatedAt=Date.now();return old;});
