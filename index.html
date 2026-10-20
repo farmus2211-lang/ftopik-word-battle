@@ -311,6 +311,9 @@ let revealCorrect = null;
 let answerProcessing = false;
 let answerProcessQueued = false;
 let revealScheduled = false;
+let xpStakeBusy = false;
+let xpStakeHandled = "";
+let xpRefundHandled = "";
 
 function validConfig(c){
   return c && c.apiKey && !String(c.apiKey).includes("PASTE_") && c.projectId && !String(c.projectId).includes("PASTE_") && c.databaseURL && !String(c.databaseURL).includes("PASTE_");
@@ -708,7 +711,7 @@ function attachRoomListeners(){
   playersRef=roomRef.child("players"); stateRef=roomRef.child("state"); myPlayerRef=playersRef.child(uidKey());
   playersRef.on("value",s=>{players=s.val()||{}; updateMetaCount(); renderWaitingPlayers(); renderBoard(); updateMyBadge(); maybeHostAdvance();});
   roomRef.child("meta/teamNames").on("value",s=>{teamNames=Object.assign({A:"TEAM TIGERS",B:"TEAM DRAGONS"},s.val()||{});renderWaitingPlayers();renderBoard();});
-  stateRef.on("value",s=>{currentState=s.val()||{}; handleState(currentState);});
+  stateRef.on("value",s=>{currentState=s.val()||{}; handleState(currentState); if(isHost&&currentState.phase==="staking")checkXPStakeAcks(currentState).catch(e=>console.warn(e));});
   myPlayerRef.on("value",s=>{const p=s.val();if(!p)return; players[uidKey()]=p; renderBoard(); updateMyBadge(); handleMyResult(p);});
   roomRef.child("answers/"+currentQuestion).on("child_added",()=>{ if(isHost) processCurrentAnswers(false); });
 }
@@ -724,6 +727,23 @@ function handleState(state){
   // javobni tekshirish uchun shu umumiy savollar ro‘yxatini yuklab olishi kerak.
   if(Array.isArray(state.questions)) questions=state.questions;
   if(state.phase==="waiting"){ showWaiting(isHost); return; }
+  if(state.phase==="staking"){
+    document.getElementById("startScreen").classList.add("hidden");
+    document.getElementById("waitingScreen").classList.remove("hidden");
+    document.getElementById("gameScreen").classList.add("hidden");
+    document.getElementById("resultScreen").classList.add("hidden");
+    document.getElementById("roomCode").textContent=roomId||"------";
+    document.getElementById("waitingStatus").textContent="💎 XP tikish tekshirilmoqda. Iltimos, kuting...";
+    processOwnXPStake(state).catch(e=>console.warn("XP stake:",e));
+    if(isHost)checkXPStakeAcks(state).catch(e=>console.warn("XP ack:",e));
+    return;
+  }
+  if(state.phase==="staking_failed"){
+    processOwnXPRefund(state).catch(e=>console.warn("XP refund:",e));
+    document.getElementById("waitingStatus").textContent="❌ XP tikish bekor qilindi. Tikilgan XP qaytarilmoqda...";
+    if(isHost && !window.__xpFailAlerted){window.__xpFailAlerted=true;setTimeout(()=>alert("XP Battle boshlanmadi. Xabarlarda kimning XP balli yetmagani yoki Firebase ruxsati muammosi ko‘rsatiladi."),100);}
+    return;
+  }
   if(state.phase==="game"){
     const q=Number(state.currentQuestion)||0;
     const changed=(q!==currentQuestion);
@@ -760,7 +780,12 @@ function renderWaitingPlayers(){
     if(manager){manager.classList.remove("hidden");manager.innerHTML=isHost&&currentState?.phase!=="game"?'<b>⚙️ Jamoalarni boshqarish</b><div class="team-name-row"><input id="teamNameA" maxlength="24" value="'+escapeHtml(teamNames.A)+'" aria-label="A jamoa nomi"><input id="teamNameB" maxlength="24" value="'+escapeHtml(teamNames.B)+'" aria-label="B jamoa nomi"></div><button class="secondary" onclick="saveTeamNames()">💾 Jamoa nomlarini saqlash</button><button class="secondary" onclick="balanceTeams()">⚖️ Teng taqsimlash</button><div class="small">O‘yin boshlanishidan oldin tarkibni o‘zgartiring.</div>':'<b>🔵 '+escapeHtml(teamNames.A)+' · 🔴 '+escapeHtml(teamNames.B)+'</b>';}
   }else{box.innerHTML=list.map((p,i)=>'<div class="wait-player"><b>'+(i===0?'👑 ':'👤 ')+escapeHtml(p.name)+'</b><span class="tag">'+(i===0?'Host':'O‘yinchi')+'</span></div>').join("");document.getElementById("teamManager")?.classList.add("hidden");}
   const start=document.getElementById("startBtn");
-  if(isHost){ start.classList.remove("hidden"); start.disabled=list.length<2; document.getElementById("waitingStatus").textContent=list.length>=2?`✅ ${list.length} o‘yinchi tayyor. Boshlash mumkin!`:`⏳ Kamida 2 o‘yinchi kerak.`; }
+  if(isHost){
+    const staking=currentState?.phase==="staking"||currentState?.phase==="staking_failed";
+    start.classList.toggle("hidden",staking);start.disabled=staking||list.length<2;
+    if(staking)document.getElementById("waitingStatus").textContent=currentState.phase==="staking_failed"?"❌ XP tikish bekor qilindi. XP qaytarilmoqda...":"💎 Har bir o‘yinchining XP tikishi tasdiqlanmoqda...";
+    else document.getElementById("waitingStatus").textContent=list.length>=2?`✅ ${list.length} o‘yinchi tayyor. Boshlash mumkin!`:`⏳ Kamida 2 o‘yinchi kerak.`;
+  }
 }
 function saveTeamNames(){
   if(!isHost||!roomRef||currentState?.phase==="game"){alert("Jamoa nomini faqat o‘yin boshlanishidan oldin xona egasi o‘zgartiradi.");return;}
@@ -797,24 +822,51 @@ async function startGame(){
   }
   const resetPlayers={}; Object.keys(players).forEach(id=>{ const p=Object.assign(createPlayer(players[id].name),players[id]); p.score=0;p.combo=0;p.maxCombo=0;p.correct=0;p.wrong=0;p.fastBonus=0;p.answerTime=0;p.answers=0;p.answered=false;p.connected=true;p.lastQuestion=-1;p.lastCorrect=null; resetPlayers[id]=p; });
   const d=serverNow()+(mode==="boss"?10:GAME_TIME)*1000;
-  const state={phase:"game",currentQuestion:0,questionCount,mode,testType,deadline:d,questions:publicQuestions(qs),revealQuestion:-1,revealCorrect:null};
+  const state={phase:isXPMode(mode)?"staking":"game",currentQuestion:0,questionCount,mode,testType,deadline:d,questions:publicQuestions(qs),revealQuestion:-1,revealCorrect:null};
   const roomLimit=isXPMode(mode)?xpModeCapacity(mode):(mode==="duel"?2:MAX_PLAYERS);
   const xpStake=isXPMode(mode)?Number(document.getElementById("xpStake")?.value||100):0;
-  const xpBattle=isXPMode(mode)?{enabled:true,stake:xpStake,pot:xpStake*countNow,settled:false,participants:Object.keys(players)}:null;
-  if(isXPMode(mode)){
-    // Prototype client-side escrow. Secure production wagering requires trusted server code.
-    const deducted=[];
-    for(const id of Object.keys(players)){
-      const ref=db.ref("ratings/"+id);
-      const tx=await ref.transaction(old=>{old=old||{};const points=Number(old.points)||0;if(points<xpStake)return;old.points=points-xpStake;old.updatedAt=Date.now();return old;});
-      if(!tx.committed){for(const done of deducted)await db.ref("ratings/"+done).transaction(old=>{old=old||{};old.points=(Number(old.points)||0)+xpStake;return old;});alert((players[id]?.name||"O‘yinchi")+" da yetarli XP yo‘q. Har bir o‘yinchiga "+xpStake+" XP kerak.");return;}
-      deducted.push(id);
-    }
-  }
-  roomRef.update({meta:{roomId,hostUid:uidKey(),hostName:safeName(),questionCount,mode,testType,maxPlayers:roomLimit,xpStake,playersCount:Object.keys(players).length,started:true,createdAt:firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP},players:resetPlayers,state:Object.assign({},state,xpBattle?{xpBattle}:{}),answers:{}})
+  const xpBattle=isXPMode(mode)?{enabled:true,stake:xpStake,pot:xpStake*countNow,settled:false,participants:Object.keys(players),acks:{},startedAt:Date.now()}:null;
+  const meta={roomId,hostUid:uidKey(),hostName:safeName(),questionCount,mode,testType,maxPlayers:roomLimit,xpStake,playersCount:Object.keys(players).length,started:true,createdAt:firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP};
+  roomRef.update({meta,players:resetPlayers,state:Object.assign({},state,xpBattle?{xpBattle}:{}),answers:{}})
     .then(()=>{questions=qs;})
-    .catch(e=>{console.error("startGame Firebase update error:",e);alert("O‘yin boshlanmadi: "+(e.message||"Firebase xatosi")+"\\nFirebase Database Rules va internet ulanishini tekshiring.");});
+    .catch(e=>{console.error("startGame Firebase update error:",e);alert("O‘yin boshlanmadi: "+(e.message||"Firebase xatosi")+"\nFirebase Database Rules va internet ulanishini tekshiring.");});
 }
+async function processOwnXPStake(state){
+  const xb=state?.xpBattle;if(!xb?.enabled||!uidKey()||!roomId||xpStakeBusy)return;
+  const id=String(xb.startedAt||"")+":"+roomId;if(xpStakeHandled===id)return;
+  if(!(xb.participants||[]).includes(uidKey()))return;
+  xpStakeBusy=true;const stake=Math.max(0,Number(xb.stake)||0);const ref=db.ref("ratings/"+uidKey());let outcome="";
+  try{
+    const tx=await ref.transaction(old=>{old=old||{};old.xpWagers=old.xpWagers||{};const prev=old.xpWagers[roomId];if(prev&&prev.startedAt===xb.startedAt){outcome=prev.status;return old;}const points=Number(old.points)||0;if(points<stake){outcome="insufficient";return;}old.points=points-stake;old.xpWagers[roomId]={startedAt:xb.startedAt,stake,status:"staked"};old.updatedAt=Date.now();outcome="staked";return old;});
+    if(!tx.committed&&outcome!=="insufficient")outcome="error";
+    if(outcome==="staked"||outcome==="refunded"||outcome==="paid"){
+      xpStakeHandled=id;
+      await roomRef.child("state/xpBattle/acks/"+uidKey()).set({ok:outcome==="staked",status:outcome,name:safeName(),at:Date.now()});
+    }else{
+      xpStakeHandled=id;
+      await roomRef.child("state/xpBattle/acks/"+uidKey()).set({ok:false,status:outcome||"error",name:safeName(),at:Date.now()});
+      alert(outcome==="insufficient"?"XP yetarli emas. Kerak: "+stake+" XP.":"XP tikib bo‘lmadi. Firebase Database Rules/ruxsatlarini tekshiring.");
+    }
+  }catch(e){console.error(e);xpStakeHandled=id;await roomRef.child("state/xpBattle/acks/"+uidKey()).set({ok:false,status:"error",name:safeName(),message:e.message||"",at:Date.now()}).catch(()=>{});alert("XP tikishda xatolik: "+(e.message||"Firebase ruxsati yoki internet"));}
+  finally{xpStakeBusy=false;}
+}
+async function checkXPStakeAcks(state){
+  if(!isHost||!roomRef||state?.phase!=="staking"||!state.xpBattle)return;
+  const ids=state.xpBattle.participants||[];const acks=state.xpBattle.acks||{};
+  if(ids.some(id=>acks[id]&&acks[id].ok===false)){
+    await roomRef.child("state").update({phase:"staking_failed",xpBattle:Object.assign({},state.xpBattle,{failureAt:Date.now()})});return;
+  }
+  if(ids.length&&ids.every(id=>acks[id]?.ok===true)){
+    const d=serverNow()+((state.mode==="boss")?10:GAME_TIME)*1000;
+    await roomRef.child("state").update({phase:"game",deadline:d,currentQuestion:0,revealQuestion:-1,revealCorrect:null});
+  }
+}
+async function processOwnXPRefund(state){
+  const xb=state?.xpBattle;if(!xb?.enabled||!uidKey()||!roomId)return;
+  const id=String(xb.startedAt||"")+":"+roomId;if(xpRefundHandled===id)return;xpRefundHandled=id;
+  try{await db.ref("ratings/"+uidKey()).transaction(old=>{if(!old)return old;old.xpWagers=old.xpWagers||{};const w=old.xpWagers[roomId];if(w&&w.startedAt===xb.startedAt&&w.status==="staked"){old.points=(Number(old.points)||0)+(Number(w.stake)||0);w.status="refunded";w.refundedAt=Date.now();old.updatedAt=Date.now();}return old;});}catch(e){xpRefundHandled="";console.warn("XP refund failed",e);}
+}
+
 function showGame(){
   document.getElementById("startScreen").classList.add("hidden");document.getElementById("waitingScreen").classList.add("hidden");document.getElementById("resultScreen").classList.add("hidden");document.getElementById("gameScreen").classList.remove("hidden");
 }
@@ -1144,22 +1196,23 @@ function renderPodium(list){
   el.innerHTML=order.map((p,i)=>p?'<div class="podium-item '+(i===1?'first':'')+'"><div class="podium-medal">'+medals[i]+'</div><div class="podium-name">'+escapeHtml(p.name)+'</div><div class="podium-score">'+(p.score||0)+' ball</div></div>':'<div></div>').join('');
 }
 async function settleXPBattle(state,list){
-  if(!state?.xpBattle?.enabled||state.xpBattle.settled||!db||!list.length)return;
-  const mode=state.mode||battleMode, stake=Number(state.xpBattle.stake)||0;if(!stake)return;
-  const settledRef=db.ref("rooms/"+roomId+"/state/xpBattle/settled");
-  const claim=await settledRef.transaction(v=>v===true?undefined:true);if(!claim.committed)return;
-  const pot=stake*list.length, awards={};
-  if(mode==="xp_team"){
+  if(!state?.xpBattle?.enabled||!db||!list.length||!uidKey())return;
+  const stake=Number(state.xpBattle.stake)||0;if(!stake)return;
+  const me=list.find(p=>p.uid===uidKey());if(!me)return;
+  const participants=state.xpBattle.participants||list.map(p=>p.uid);const pot=stake*participants.length;
+  const awards={};
+  if(state.mode==="xp_team"){
     const totals={A:0,B:0};list.forEach(p=>{const t=(players[p.uid]||{}).team;if(t)totals[t]+=Number(p.score)||0;});
-    if(totals.A===totals.B)list.forEach(p=>awards[p.uid]=stake);
-    else {const win=totals.A>totals.B?"A":"B", lose=win==="A"?"B":"A";const winners=list.filter(p=>(players[p.uid]||{}).team===win),losers=list.filter(p=>(players[p.uid]||{}).team===lose);const a=Math.floor(pot*.75),b=pot-a;winners.forEach((p,i)=>awards[p.uid]=Math.floor(a/winners.length)+(i===0?a%winners.length:0));losers.forEach((p,i)=>awards[p.uid]=Math.floor(b/losers.length)+(i===0?b%losers.length:0));}
+    if(totals.A===totals.B){list.forEach(p=>awards[p.uid]=stake);}
+    else{const win=totals.A>totals.B?"A":"B",lose=win==="A"?"B":"A";const winners=list.filter(p=>(players[p.uid]||{}).team===win),losers=list.filter(p=>(players[p.uid]||{}).team===lose);const a=Math.floor(pot*.75),b=pot-a;winners.forEach((p,i)=>awards[p.uid]=Math.floor(a/Math.max(1,winners.length))+(i===0?a%Math.max(1,winners.length):0));losers.forEach((p,i)=>awards[p.uid]=Math.floor(b/Math.max(1,losers.length))+(i===0?b%Math.max(1,losers.length):0));}
   }else{
     const sorted=[...list].sort((a,b)=>Number(b.score||0)-Number(a.score||0)||Number(b.maxCombo||0)-Number(a.maxCombo||0));
     if(sorted[0]&&sorted[1]&&Number(sorted[0].score||0)===Number(sorted[1].score||0)){list.forEach(p=>awards[p.uid]=stake);}
-    else {if(sorted[0])awards[sorted[0].uid]=Math.floor(pot*.75);if(sorted[1])awards[sorted[1].uid]=(awards[sorted[1].uid]||0)+Math.floor(pot*.25);const rem=pot-Object.values(awards).reduce((a,b)=>a+b,0);if(sorted[0])awards[sorted[0].uid]+=rem;}
+    else{if(sorted[0])awards[sorted[0].uid]=Math.floor(pot*.75);if(sorted[1])awards[sorted[1].uid]=Math.floor(pot*.25);const rem=pot-Object.values(awards).reduce((a,b)=>a+b,0);if(sorted[0])awards[sorted[0].uid]+=rem;}
   }
-  for(const [id,amount] of Object.entries(awards))await db.ref("ratings/"+id).transaction(old=>{old=old||{};old.points=(Number(old.points)||0)+Number(amount||0);old.updatedAt=Date.now();return old;});
-  await db.ref("rooms/"+roomId+"/state/xpBattle/settledAt").set(Date.now());
+  const amount=Number(awards[uidKey()]||0);const ref=db.ref("ratings/"+uidKey());
+  await ref.transaction(old=>{old=old||{};old.xpWagers=old.xpWagers||{};const w=old.xpWagers[roomId];if(!w||w.startedAt!==state.xpBattle.startedAt||w.status!=="staked")return old;old.points=(Number(old.points)||0)+amount;w.status="paid";w.payout=amount;w.paidAt=Date.now();old.updatedAt=Date.now();return old;});
+  loadGlobalRating();
 }
 function recordMyRating(list){
   if(ratingRecorded||!db||!user)return;
