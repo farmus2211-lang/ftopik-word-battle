@@ -621,50 +621,47 @@ function renderRooms(data){
 
 let creatingRoom = false;
 function createRoom(){
-  // Ikki marta bosish yoki sekin internet sababli takroriy xona ochilishining oldini oladi.
-  if(creatingRoom || (roomRef && currentState && currentState.phase==="waiting")){
-    if(creatingRoom) return;
-    alert("Sizda allaqachon kutish xonasi ochiq.");
-    return;
-  }
-  const createBtn = document.querySelector('button[onclick="createRoom()"]');
-  creatingRoom = true;
-  if(createBtn){ createBtn.disabled=true; createBtn.dataset.oldText=createBtn.textContent; createBtn.textContent="⏳ Xona yaratilmoqda..."; }
+  if(creatingRoom)return;
+  if(roomRef&&currentState&&currentState.phase==="waiting"){alert("Sizda allaqachon kutish xonasi ochiq.");return;}
+  const createBtn=document.querySelector('button[onclick="createRoom()"]');
+  creatingRoom=true;
+  if(createBtn){createBtn.disabled=true;createBtn.dataset.oldText=createBtn.textContent;createBtn.textContent="⏳ Xona yaratilmoqda...";}
   myName=document.getElementById("nameInput").value.trim();
   questionCount=Number(document.getElementById("questionMode").value)||10;
   battleMode=document.getElementById("battleMode")?.value||"open";
   testType=document.getElementById("testType")?.value||"vocab";
   if(battleMode==="boss")questionCount=30;
-  if(!myName){alert("Avval ismingizni kiriting!"); resetCreateRoomButton(); return;}
+  if(!myName){alert("Avval ismingizni kiriting!");resetCreateRoomButton();return;}
+  const xpStake=isXPMode(battleMode)?Number(document.getElementById("xpStake")?.value||100):0;
   ensureFirebaseReady().then(async function(ok){
-    if(!ok) { resetCreateRoomButton(); return; }
-    try {
-      // Shu foydalanuvchining oldingi kutish xonasi bo‘lsa, yangisini yaratmay o‘shanga qaytadi.
+    if(!ok){resetCreateRoomButton();return;}
+    try{
       const snap=await db.ref("rooms").once("value");
       const all=snap.val()||{};
       const existing=Object.keys(all).map(k=>all[k]).find(r=>
-        r && r.meta && r.state && r.meta.hostUid===uidKey() &&
-        r.meta.started!==true && r.state.phase==="waiting" &&
-        r.players && r.players[uidKey()] && Number(r.meta.createdAt||0)>Date.now()-2*60*60*1000
-      );
+        r&&r.meta&&r.state&&r.meta.hostUid===uidKey()&&r.meta.started!==true&&r.state.phase==="waiting"&&
+        r.players&&r.players[uidKey()]&&Number(r.meta.createdAt||0)>Date.now()-2*60*60*1000);
       if(existing){
-        roomId=String(existing.meta.roomId); isHost=true; roomRef=db.ref(roomPath());
-        showWaiting(true); attachRoomListeners(); resetCreateRoomButton(); return;
+        const m=existing.meta;
+        const same=m.mode===battleMode&&m.testType===testType&&Number(m.questionCount)===questionCount&&Number(m.xpStake||0)===xpStake;
+        if(same){
+          roomId=String(m.roomId);isHost=true;roomRef=db.ref(roomPath());
+          showWaiting(true);attachRoomListeners();resetCreateRoomButton();return;
+        }
+        await db.ref("rooms/"+m.roomId).remove();   // sozlama o'zgargan: eskisini o'chiramiz
       }
-      roomId=randomRoomId(); isHost=true;
-      roomRef=db.ref(roomPath());
-      const p=createPlayer(myName); p.team=battleMode==="team"?"A":null; players={}; players[uidKey()]=p;
+      roomId=randomRoomId();isHost=true;roomRef=db.ref(roomPath());
+      const p=createPlayer(myName);
+      p.team=isTeamMode(battleMode)?"A":null;      // xp_team uchun ham
+      players={};players[uidKey()]=p;
       const roomLimit=isXPMode(battleMode)?xpModeCapacity(battleMode):(battleMode==="duel"?2:MAX_PLAYERS);
-      const xpStake=isXPMode(battleMode)?Number(document.getElementById("xpStake")?.value||100):0;
       const meta={roomId,hostUid:uidKey(),hostName:safeName(),questionCount,mode:battleMode,testType,maxPlayers:roomLimit,xpStake,playersCount:1,started:false,teamNames:{A:"TEAM TIGERS",B:"TEAM DRAGONS"},createdAt:firebase.database.ServerValue.TIMESTAMP};
-      await roomRef.set({meta:meta,players:{[uidKey()]:p},state:{phase:"waiting",currentQuestion:0,questionCount,deadline:0}});
-      // Host uzilib qolsa butun xona o‘chadi, faqat meta emas.
+      await roomRef.set({meta,players:{[uidKey()]:p},state:{phase:"waiting",currentQuestion:0,questionCount,deadline:0}});
       await roomRef.onDisconnect().remove();
       roomRef.child("players").child(uidKey()).onDisconnect().remove();
-      showWaiting(true); attachRoomListeners();
-    } catch(e) {
-      console.error(e); alert("Xona yaratilmadi: "+(e.message||e));
-    } finally { resetCreateRoomButton(); }
+      showWaiting(true);attachRoomListeners();
+    }catch(e){console.error(e);alert("Xona yaratilmadi: "+(e.message||e));}
+    finally{resetCreateRoomButton();}
   }).catch(e=>{console.error(e);alert("Firebase xatosi: "+(e.message||e));resetCreateRoomButton();});
 }
 function resetCreateRoomButton(){
@@ -826,7 +823,7 @@ async function startGame(){
   const roomLimit=isXPMode(mode)?xpModeCapacity(mode):(mode==="duel"?2:MAX_PLAYERS);
   const xpStake=isXPMode(mode)?Number(document.getElementById("xpStake")?.value||100):0;
   const xpBattle=isXPMode(mode)?{enabled:true,stake:xpStake,pot:xpStake*countNow,settled:false,participants:Object.keys(players),acks:{},startedAt:Date.now()}:null;
-  const meta={roomId,hostUid:uidKey(),hostName:safeName(),questionCount,mode,testType,maxPlayers:roomLimit,xpStake,playersCount:Object.keys(players).length,started:true,createdAt:firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP};
+  const meta={roomId,hostUid:uidKey(),hostName:safeName(),questionCount,mode,testType,maxPlayers:roomLimit,xpStake,playersCount:Object.keys(players).length,started:true,teamNames,createdAt:firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP};
   roomRef.update({meta,players:resetPlayers,state:Object.assign({},state,xpBattle?{xpBattle}:{}),answers:{}})
     .then(()=>{questions=qs;})
     .catch(e=>{console.error("startGame Firebase update error:",e);alert("O‘yin boshlanmadi: "+(e.message||"Firebase xatosi")+"\nFirebase Database Rules va internet ulanishini tekshiring.");});
@@ -835,34 +832,47 @@ async function processOwnXPStake(state){
   const xb=state?.xpBattle;if(!xb?.enabled||!uidKey()||!roomId||xpStakeBusy||!db||!roomRef)return;
   const id=String(xb.startedAt||"")+":"+roomId;if(xpStakeHandled===id)return;
   if(!(xb.participants||[]).includes(uidKey()))return;
-  xpStakeBusy=true;const stake=Math.max(0,Number(xb.stake)||0);const ref=db.ref("ratings/"+uidKey());let outcome="",balance=null,detail="";
+  xpStakeBusy=true;
+  const stake=Math.max(0,Number(xb.stake)||0);
+  const ref=db.ref("ratings/"+uidKey());
+  const keep=()=>{};
+  let outcome="",balance=null,detail="";
   try{
-    // Load the server balance first. If the local Firebase cache is empty,
-    // a transaction callback may receive null and abort before fetching server data.
-    const initialSnap=await ref.once("value");
-    const initialData=initialSnap.val()||{};
-    balance=Number(initialData.points)||0;
+    ref.on("value",keep);                       // keshni serverdagi qiymat bilan to'ldiradi
+    const snap=await ref.once("value");
+    balance=Number((snap.val()||{}).points)||0;
     const tx=await ref.transaction(old=>{
-      old=old||{};old.xpWagers=old.xpWagers||{};const prev=old.xpWagers[roomId];
+      if(old===null){outcome="empty";return null;} // lokal kesh bo'sh: bekor qilmaymiz, server qiymati bilan qayta chaqiriladi
+      old.xpWagers=old.xpWagers||{};
+      const prev=old.xpWagers[roomId];
       if(prev&&prev.startedAt===xb.startedAt){outcome=prev.status;balance=Number(old.points)||0;return old;}
       const points=Number(old.points)||0;balance=points;
       if(points<stake){outcome="insufficient";return;}
-      old.points=points-stake;old.xpWagers[roomId]={startedAt:xb.startedAt,stake,status:"staked"};old.updatedAt=Date.now();outcome="staked";balance=old.points;return old;
+      old.points=points-stake;
+      old.xpWagers[roomId]={startedAt:xb.startedAt,stake,status:"staked"};
+      old.updatedAt=Date.now();outcome="staked";balance=old.points;return old;
     });
+    if(outcome==="empty")outcome="insufficient";   // serverda ham yozuv yo'q = XP yo'q
     if(!tx.committed&&outcome!=="insufficient")outcome="error";
+    const ackRef=roomRef.child("state/xpBattle/acks/"+uidKey());
+    xpStakeHandled=id;
     if(outcome==="staked"){
-      xpStakeHandled=id;
-      await roomRef.child("state/xpBattle/acks/"+uidKey()).set({ok:true,status:outcome,name:safeName(),balance,stake,at:Date.now()});
+      await ackRef.set({ok:true,status:outcome,name:safeName(),balance,stake,at:Date.now()});
     }else if(outcome==="refunded"||outcome==="paid"){
-      xpStakeHandled=id;
-      await roomRef.child("state/xpBattle/acks/"+uidKey()).set({ok:false,status:outcome,name:safeName(),balance,stake,at:Date.now(),message:"Bu xona uchun tikish avval yakunlangan."});
+      await ackRef.set({ok:false,status:outcome,name:safeName(),balance,stake,at:Date.now(),message:"Bu xona uchun tikish avval yakunlangan."});
     }else{
-      xpStakeHandled=id;detail=outcome==="insufficient"?"XP yetarli emas":"XP tranzaksiyasi bajarilmadi";
-      await roomRef.child("state/xpBattle/acks/"+uidKey()).set({ok:false,status:outcome||"error",name:safeName(),balance,stake,message:detail,at:Date.now()});
-      alert(outcome==="insufficient"?"XP yetarli emas. Sizda: "+(balance??0)+" XP, kerak: "+stake+" XP.":"XP tikilmadi. Firebase xatosi yoki tranzaksiya bajarilmadi. Balans: "+(balance??"noma’lum")+" XP.");
+      detail=outcome==="insufficient"?"XP yetarli emas":"XP tranzaksiyasi bajarilmadi";
+      await ackRef.set({ok:false,status:outcome||"error",name:safeName(),balance,stake,message:detail,at:Date.now()});
+      alert(outcome==="insufficient"
+        ?"XP yetarli emas. Sizda: "+(balance??0)+" XP, kerak: "+stake+" XP.\n(XP shu qurilma/brauzer akkauntiga bog'liq.)"
+        :"XP tikilmadi. Firebase xatosi yoki tranzaksiya bajarilmadi. Balans: "+(balance??"noma’lum")+" XP.");
     }
-  }catch(e){console.error("XP stake transaction error",e);xpStakeHandled=id;detail=(e&&e.code?e.code+": ":"")+(e.message||"noma’lum xato");await roomRef.child("state/xpBattle/acks/"+uidKey()).set({ok:false,status:"error",name:safeName(),stake,message:detail,at:Date.now()}).catch(()=>{});alert("XP tikishda xatolik: "+detail);}
-  finally{xpStakeBusy=false;}
+  }catch(e){
+    console.error("XP stake transaction error",e);
+    xpStakeHandled=id;detail=(e&&e.code?e.code+": ":"")+(e.message||"noma’lum xato");
+    await roomRef.child("state/xpBattle/acks/"+uidKey()).set({ok:false,status:"error",name:safeName(),stake,message:detail,at:Date.now()}).catch(()=>{});
+    alert("XP tikishda xatolik: "+detail);
+  }finally{ref.off("value",keep);xpStakeBusy=false;}
 }
 async function checkXPStakeAcks(state){
   if(!isHost||!roomRef||state?.phase!=="staking"||!state.xpBattle)return;
@@ -882,7 +892,26 @@ async function checkXPStakeAcks(state){
 async function processOwnXPRefund(state){
   const xb=state?.xpBattle;if(!xb?.enabled||!uidKey()||!roomId)return;
   const id=String(xb.startedAt||"")+":"+roomId;if(xpRefundHandled===id)return;xpRefundHandled=id;
-  try{await db.ref("ratings/"+uidKey()).transaction(old=>{if(!old)return old;old.xpWagers=old.xpWagers||{};const w=old.xpWagers[roomId];if(w&&w.startedAt===xb.startedAt&&w.status==="staked"){old.points=(Number(old.points)||0)+(Number(w.stake)||0);w.status="refunded";w.refundedAt=Date.now();old.updatedAt=Date.now();}return old;});}catch(e){xpRefundHandled="";console.warn("XP refund failed",e);}
+  const ref=db.ref("ratings/"+uidKey());const keep=()=>{};
+  try{
+    ref.on("value",keep);await ref.once("value");
+    await ref.transaction(old=>{
+      if(old===null)return null;
+      old.xpWagers=old.xpWagers||{};const w=old.xpWagers[roomId];
+      if(w&&w.startedAt===xb.startedAt&&w.status==="staked"){
+        old.points=(Number(old.points)||0)+(Number(w.stake)||0);
+        w.status="refunded";w.refundedAt=Date.now();old.updatedAt=Date.now();
+      }
+      return old;
+    });
+    if(isHost&&roomRef){
+      setTimeout(()=>{
+        window.__xpFailAlerted=false;
+        roomRef.update({state:{phase:"waiting",currentQuestion:0,questionCount,deadline:0},"meta/started":false}).catch(()=>{});
+      },6000);
+    }
+  }catch(e){xpRefundHandled="";console.warn("XP refund failed",e);}
+  finally{ref.off("value",keep);}
 }
 
 function showGame(){
@@ -1108,7 +1137,7 @@ function handleMyResult(p){
 }
 function accuracy(p){return p&&p.answers?Math.round((p.correct/p.answers)*100):0}
 function avgTime(p){return p&&p.answers?(p.answerTime/p.answers).toFixed(1):"0.0"}
-function rematchGame(){
+function rematchGame(){if(isXPMode(battleMode||(currentState&&currentState.mode))){alert("XP rejimida qayta o‘ynash uchun yangi xona yarating (XP qayta tikilishi kerak).");return;}
   if(!isHost || !roomRef) return;
   ratingRecorded=false;
   const activeIds=Object.keys(players||{}).filter(id=>players[id] && players[id].connected!==false);
