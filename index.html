@@ -843,6 +843,9 @@ async function processOwnXPStake(state){
     const initialData=initialSnap.val()||{};
     balance=Number(initialData.points)||0;
     const tx=await ref.transaction(old=>{
+      // If transaction callback receives null despite the just-read snapshot,
+      // seed it from the fetched rating record rather than falsely treating XP as 0.
+      if(old===null && initialSnap.exists()) old=JSON.parse(JSON.stringify(initialData));
       old=old||{};old.xpWagers=old.xpWagers||{};const prev=old.xpWagers[roomId];
       if(prev&&prev.startedAt===xb.startedAt){outcome=prev.status;balance=Number(old.points)||0;return old;}
       const points=Number(old.points)||0;balance=points;
@@ -859,7 +862,7 @@ async function processOwnXPStake(state){
     }else{
       xpStakeHandled=id;detail=outcome==="insufficient"?"XP yetarli emas":"XP tranzaksiyasi bajarilmadi";
       await roomRef.child("state/xpBattle/acks/"+uidKey()).set({ok:false,status:outcome||"error",name:safeName(),balance,stake,message:detail,at:Date.now()});
-      alert(outcome==="insufficient"?"XP yetarli emas. Sizda: "+(balance??0)+" XP, kerak: "+stake+" XP.":"XP tikilmadi. Firebase xatosi yoki tranzaksiya bajarilmadi. Balans: "+(balance??"noma’lum")+" XP.");
+      alert(outcome==="insufficient"?"XP yetarli emas. Sizda: "+(balance??0)+" XP, kerak: "+stake+" XP.\nHisob: "+(initialData.name||safeName())+"\nUID: "+uidKey()+"\nFirebase manzili: ratings/"+uidKey():"XP tikilmadi. Firebase xatosi yoki tranzaksiya bajarilmadi. Balans: "+(balance??"noma’lum")+" XP.\nUID: "+uidKey()+"\nFirebase manzili: ratings/"+uidKey());
     }
   }catch(e){console.error("XP stake transaction error",e);xpStakeHandled=id;detail=(e&&e.code?e.code+": ":"")+(e.message||"noma’lum xato");await roomRef.child("state/xpBattle/acks/"+uidKey()).set({ok:false,status:"error",name:safeName(),stake,message:detail,at:Date.now()}).catch(()=>{});alert("XP tikishda xatolik: "+detail);}
   finally{xpStakeBusy=false;}
