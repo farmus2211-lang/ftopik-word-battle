@@ -741,7 +741,7 @@ function handleState(state){
   if(state.phase==="staking_failed"){
     processOwnXPRefund(state).catch(e=>console.warn("XP refund:",e));
     document.getElementById("waitingStatus").textContent="❌ XP tikish bekor qilindi. Tikilgan XP qaytarilmoqda...";
-    if(isHost && !window.__xpFailAlerted){window.__xpFailAlerted=true;setTimeout(()=>alert("XP Battle boshlanmadi. Xabarlarda kimning XP balli yetmagani yoki Firebase ruxsati muammosi ko‘rsatiladi."),100);}
+    const detail=state.xpBattle?.failureDetails;if(detail)document.getElementById("waitingStatus").textContent="❌ XP tikish bekor qilindi: "+detail;
     return;
   }
   if(state.phase==="game"){
@@ -832,29 +832,42 @@ async function startGame(){
     .catch(e=>{console.error("startGame Firebase update error:",e);alert("O‘yin boshlanmadi: "+(e.message||"Firebase xatosi")+"\nFirebase Database Rules va internet ulanishini tekshiring.");});
 }
 async function processOwnXPStake(state){
-  const xb=state?.xpBattle;if(!xb?.enabled||!uidKey()||!roomId||xpStakeBusy)return;
+  const xb=state?.xpBattle;if(!xb?.enabled||!uidKey()||!roomId||xpStakeBusy||!db||!roomRef)return;
   const id=String(xb.startedAt||"")+":"+roomId;if(xpStakeHandled===id)return;
   if(!(xb.participants||[]).includes(uidKey()))return;
-  xpStakeBusy=true;const stake=Math.max(0,Number(xb.stake)||0);const ref=db.ref("ratings/"+uidKey());let outcome="";
+  xpStakeBusy=true;const stake=Math.max(0,Number(xb.stake)||0);const ref=db.ref("ratings/"+uidKey());let outcome="",balance=null,detail="";
   try{
-    const tx=await ref.transaction(old=>{old=old||{};old.xpWagers=old.xpWagers||{};const prev=old.xpWagers[roomId];if(prev&&prev.startedAt===xb.startedAt){outcome=prev.status;return old;}const points=Number(old.points)||0;if(points<stake){outcome="insufficient";return;}old.points=points-stake;old.xpWagers[roomId]={startedAt:xb.startedAt,stake,status:"staked"};old.updatedAt=Date.now();outcome="staked";return old;});
+    const tx=await ref.transaction(old=>{
+      old=old||{};old.xpWagers=old.xpWagers||{};const prev=old.xpWagers[roomId];
+      if(prev&&prev.startedAt===xb.startedAt){outcome=prev.status;balance=Number(old.points)||0;return old;}
+      const points=Number(old.points)||0;balance=points;
+      if(points<stake){outcome="insufficient";return;}
+      old.points=points-stake;old.xpWagers[roomId]={startedAt:xb.startedAt,stake,status:"staked"};old.updatedAt=Date.now();outcome="staked";balance=old.points;return old;
+    });
     if(!tx.committed&&outcome!=="insufficient")outcome="error";
-    if(outcome==="staked"||outcome==="refunded"||outcome==="paid"){
+    if(outcome==="staked"){
       xpStakeHandled=id;
-      await roomRef.child("state/xpBattle/acks/"+uidKey()).set({ok:outcome==="staked",status:outcome,name:safeName(),at:Date.now()});
+      await roomRef.child("state/xpBattle/acks/"+uidKey()).set({ok:true,status:outcome,name:safeName(),balance,stake,at:Date.now()});
+    }else if(outcome==="refunded"||outcome==="paid"){
+      xpStakeHandled=id;
+      await roomRef.child("state/xpBattle/acks/"+uidKey()).set({ok:false,status:outcome,name:safeName(),balance,stake,at:Date.now(),message:"Bu xona uchun tikish avval yakunlangan."});
     }else{
-      xpStakeHandled=id;
-      await roomRef.child("state/xpBattle/acks/"+uidKey()).set({ok:false,status:outcome||"error",name:safeName(),at:Date.now()});
-      alert(outcome==="insufficient"?"XP yetarli emas. Kerak: "+stake+" XP.":"XP tikib bo‘lmadi. Firebase Database Rules/ruxsatlarini tekshiring.");
+      xpStakeHandled=id;detail=outcome==="insufficient"?"XP yetarli emas":"XP tranzaksiyasi bajarilmadi";
+      await roomRef.child("state/xpBattle/acks/"+uidKey()).set({ok:false,status:outcome||"error",name:safeName(),balance,stake,message:detail,at:Date.now()});
+      alert(outcome==="insufficient"?"XP yetarli emas. Sizda: "+(balance??0)+" XP, kerak: "+stake+" XP.":"XP tikilmadi. Firebase xatosi yoki tranzaksiya bajarilmadi. Balans: "+(balance??"noma’lum")+" XP.");
     }
-  }catch(e){console.error(e);xpStakeHandled=id;await roomRef.child("state/xpBattle/acks/"+uidKey()).set({ok:false,status:"error",name:safeName(),message:e.message||"",at:Date.now()}).catch(()=>{});alert("XP tikishda xatolik: "+(e.message||"Firebase ruxsati yoki internet"));}
+  }catch(e){console.error("XP stake transaction error",e);xpStakeHandled=id;detail=(e&&e.code?e.code+": ":"")+(e.message||"noma’lum xato");await roomRef.child("state/xpBattle/acks/"+uidKey()).set({ok:false,status:"error",name:safeName(),stake,message:detail,at:Date.now()}).catch(()=>{});alert("XP tikishda xatolik: "+detail);}
   finally{xpStakeBusy=false;}
 }
 async function checkXPStakeAcks(state){
   if(!isHost||!roomRef||state?.phase!=="staking"||!state.xpBattle)return;
   const ids=state.xpBattle.participants||[];const acks=state.xpBattle.acks||{};
-  if(ids.some(id=>acks[id]&&acks[id].ok===false)){
-    await roomRef.child("state").update({phase:"staking_failed",xpBattle:Object.assign({},state.xpBattle,{failureAt:Date.now()})});return;
+  const failed=ids.filter(id=>acks[id]&&acks[id].ok===false);
+  if(failed.length){
+    const details=failed.map(id=>{const a=acks[id]||{};return (a.name||id)+": "+(a.status==="insufficient"?"XP yetarli emas (mavjud "+(a.balance??"?")+", kerak "+(a.stake??state.xpBattle.stake)+")":(a.message||a.status||"xato"));}).join("; ");
+    await roomRef.child("state").update({phase:"staking_failed",xpBattle:Object.assign({},state.xpBattle,{failureAt:Date.now(),failureDetails:details})});
+    if(!window.__xpFailAlerted){window.__xpFailAlerted=true;alert("XP Battle boshlanmadi. "+details);}
+    return;
   }
   if(ids.length&&ids.every(id=>acks[id]?.ok===true)){
     const d=serverNow()+((state.mode==="boss")?10:GAME_TIME)*1000;
@@ -1228,7 +1241,7 @@ function recordMyRating(list){
     const old=current||{};previousXP=Number(old.points)||0;
     const history=old.history||{};
     history[gameKey]={points:score,won:won,at:Date.now()};
-    return {name:safeName(),points:previousXP+score,games:Number(old.games||0)+1,wins:Number(old.wins||0)+(won?1:0),bestScore:Math.max(Number(old.bestScore||0),score),history:history,updatedAt:Date.now()};
+    return Object.assign({},old,{name:safeName(),points:previousXP+score,games:Number(old.games||0)+1,wins:Number(old.wins||0)+(won?1:0),bestScore:Math.max(Number(old.bestScore||0),score),history:history,updatedAt:Date.now()});
   }).then(result=>{
     if(!result.committed)return;
     const saved=result.snapshot.val()||{};const newXP=Number(saved.points)||0;
