@@ -209,9 +209,20 @@ button.secondary{background:linear-gradient(135deg,#1b1930,#171629);color:#e7e1f
       <option value="20">20 ta savol</option>
       <option value="30">30 ta savol</option>
     </select>
+    <label for="roomVisibility">🔐 Xona turi</label>
+    <select id="roomVisibility" onchange="togglePrivateRoomCode()">
+      <option value="public">🌐 Ochiq xona — hamma qo‘shila oladi</option>
+      <option value="private">🔒 Kodli xona — faqat kod bilan</option>
+    </select>
+    <div id="privateCodeBox" class="hidden">
+      <label for="privateRoomCode">O‘zingiz tanlagan 4 xonali kod</label>
+      <input id="privateRoomCode" inputmode="numeric" maxlength="4" placeholder="Masalan: 2580" autocomplete="off">
+      <div class="small">Bu kodni do‘stlaringizga yuboring. Xona ochiq ro‘yxatda ko‘rinmaydi.</div>
+    </div>
     <button onclick="createRoom()">🏠 Xona yaratish</button>
     <hr class="divider">
-    <input id="roomInput" placeholder="Xona kodini kiriting" autocomplete="off">
+    <label for="roomInput">🔑 Kodli xonaga kirish</label>
+    <input id="roomInput" inputmode="numeric" maxlength="4" placeholder="4 xonali xona kodi" autocomplete="off">
     <button onclick="joinByCode()">🚀 Kod orqali qo‘shilish</button>
 
     <div class="public-lobby">
@@ -627,6 +638,8 @@ function renderRooms(data){
   }).filter(r=>{
     if(!r || !r.meta || !r.state) return false;
     if(r.meta.started===true || r.state.phase!=="waiting") return false;
+    // Kodli xonalar ommaviy ro‘yxatda ko‘rsatilmaydi.
+    if(r.meta.visibility==="private") return false;
 
     const playersObj=r.players||{};
     const playerIds=Object.keys(playersObj).filter(id=>playersObj[id] && playersObj[id].connected!==false);
@@ -662,6 +675,10 @@ function renderRooms(data){
 }
 
 let creatingRoom = false;
+function togglePrivateRoomCode(){
+  const isPrivate=document.getElementById("roomVisibility")?.value==="private";
+  document.getElementById("privateCodeBox")?.classList.toggle("hidden",!isPrivate);
+}
 function createRoom(){
   if(creatingRoom)return;
   if(roomRef&&currentState&&currentState.phase==="waiting"){alert("Sizda allaqachon kutish xonasi ochiq.");return;}
@@ -672,6 +689,9 @@ function createRoom(){
   questionCount=Number(document.getElementById("questionMode").value)||10;
   battleMode=document.getElementById("battleMode")?.value||"open";
   testType=document.getElementById("testType")?.value||"vocab";
+  const visibility=document.getElementById("roomVisibility")?.value||"public";
+  const customCode=(document.getElementById("privateRoomCode")?.value||"").trim();
+  if(visibility==="private"&&!/^\d{4}$/.test(customCode)){alert("Maxfiy xona uchun aynan 4 ta raqam kiriting.");resetCreateRoomButton();return;}
   if(battleMode==="boss")questionCount=30;
   if(!myName){alert("Avval ismingizni kiriting!");resetCreateRoomButton();return;}
   const xpStake=isXPMode(battleMode)?Number(document.getElementById("xpStake")?.value||100):0;
@@ -692,12 +712,21 @@ function createRoom(){
         }
         await db.ref("rooms/"+m.roomId).remove();   // sozlama o'zgargan: eskisini o'chiramiz
       }
-      roomId=randomRoomId();isHost=true;roomRef=db.ref(roomPath());
+      if(visibility==="private"){
+        const collision=all[customCode];
+        if(collision && collision.meta && collision.state && collision.meta.started!==true && collision.state.phase==="waiting"){
+          alert("Bu kod band. Boshqa 4 xonali kod tanlang.");return;
+        }
+        roomId=customCode;
+      }else{
+        roomId=randomRoomId();
+      }
+      isHost=true;roomRef=db.ref(roomPath());
       const p=createPlayer(myName);
       p.team=isTeamMode(battleMode)?"A":null;      // xp_team uchun ham
       players={};players[uidKey()]=p;
       const roomLimit=isXPMode(battleMode)?xpModeCapacity(battleMode):(battleMode==="duel"?2:MAX_PLAYERS);
-      const meta={roomId,hostUid:uidKey(),hostName:safeName(),questionCount,mode:battleMode,testType,maxPlayers:roomLimit,xpStake,playersCount:1,started:false,teamNames:{A:"TEAM TIGERS",B:"TEAM DRAGONS"},createdAt:firebase.database.ServerValue.TIMESTAMP};
+      const meta={roomId,visibility,hostUid:uidKey(),hostName:safeName(),questionCount,mode:battleMode,testType,maxPlayers:roomLimit,xpStake,playersCount:1,started:false,teamNames:{A:"TEAM TIGERS",B:"TEAM DRAGONS"},createdAt:firebase.database.ServerValue.TIMESTAMP};
       await roomRef.set({meta,players:{[uidKey()]:p},state:{phase:"waiting",currentQuestion:0,questionCount,deadline:0}});
       await roomRef.onDisconnect().remove();
       roomRef.child("players").child(uidKey()).onDisconnect().remove();
@@ -716,8 +745,16 @@ function joinByCode(){
   myName=document.getElementById("nameInput").value.trim();
   const code=document.getElementById("roomInput").value.trim().toUpperCase();
   if(!myName){alert("Avval ismingizni kiriting!");return;}
-  if(!code){alert("Xona kodini kiriting!");return;}
-  ensureFirebaseReady().then(function(ok){ if(ok) joinRoom(code); });
+  if(!/^\d{4}$/.test(code)){alert("Xona kodi aynan 4 ta raqamdan iborat bo‘lishi kerak.");return;}
+  ensureFirebaseReady().then(async function(ok){
+    if(!ok)return;
+    try{
+      const snap=await db.ref("rooms/"+code).once("value");
+      const r=snap.val();
+      if(!r||!r.meta||r.meta.visibility!=="private"){alert("Bunday kodli xona topilmadi.");return;}
+      joinRoom(code);
+    }catch(e){console.error(e);alert("Xonani tekshirishda xatolik yuz berdi.");}
+  });
 }
 function joinPublicRoom(id){
   myName=document.getElementById("nameInput").value.trim();
