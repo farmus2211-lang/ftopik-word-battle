@@ -220,10 +220,7 @@ button.secondary{background:linear-gradient(135deg,#1b1930,#171629);color:#e7e1f
       <div class="small">Bu kodni do‘stlaringizga yuboring. Xona ochiq ro‘yxatda ko‘rinmaydi.</div>
     </div>
     <button onclick="createRoom()">🏠 Xona yaratish</button>
-    <hr class="divider">
-    <label for="roomInput">🔑 Kodli xonaga kirish</label>
-    <input id="roomInput" inputmode="numeric" maxlength="4" placeholder="4 xonali xona kodi" autocomplete="off">
-    <button onclick="joinByCode()">🚀 Kod orqali qo‘shilish</button>
+    <div class="small" style="margin-top:10px">🔒 Maxfiy xonaga faqat xona egasi yuborgan taklif havolasi orqali kiriladi.</div>
 
     <div class="public-lobby">
       <div class="public-head">
@@ -268,7 +265,7 @@ button.secondary{background:linear-gradient(135deg,#1b1930,#171629);color:#e7e1f
     <div id="waitingPlayers" class="wait-list"></div>
     <div id="teamManager" class="team-manager hidden"></div>
     <button id="startBtn" onclick="startGame()" disabled>▶️ O‘yinni boshlash</button>
-    <button class="secondary" onclick="copyRoomCode()">📋 Kodni nusxalash</button>
+    <button class="secondary" onclick="copyRoomCode()">🔗 Taklif havolasini nusxalash</button>
     <div id="connectionLine" class="connection-line"></div>
   </div>
 
@@ -742,21 +739,6 @@ function resetCreateRoomButton(){
   if(b){b.disabled=false;b.textContent=b.dataset.oldText||"🏠 Xona yaratish";}
 }
 
-function joinByCode(){
-  myName=document.getElementById("nameInput").value.trim();
-  const code=document.getElementById("roomInput").value.trim().toUpperCase();
-  if(!myName){alert("Avval ismingizni kiriting!");return;}
-  if(!/^\d{4}$/.test(code)){alert("Xona kodi aynan 4 ta raqamdan iborat bo‘lishi kerak.");return;}
-  ensureFirebaseReady().then(async function(ok){
-    if(!ok)return;
-    try{
-      const snap=await db.ref("rooms/"+code).once("value");
-      const r=snap.val();
-      if(!r||!r.meta||r.meta.visibility!=="private"){alert("Bunday kodli xona topilmadi.");return;}
-      joinRoom(code);
-    }catch(e){console.error(e);alert("Xonani tekshirishda xatolik yuz berdi.");}
-  });
-}
 function joinPublicRoom(id){
   myName=document.getElementById("nameInput").value.trim();
   if(!myName){alert("Avval ismingizni kiriting!");return;}
@@ -1439,12 +1421,44 @@ function showResultFromState(state){
   if(!tie)launchConfetti();
 }
 function launchConfetti(){const symbols=['🎉','✨','🎊','💜','⭐'];for(let i=0;i<30;i++){const d=document.createElement("div");d.className="confetti";d.textContent=symbols[Math.floor(Math.random()*symbols.length)];d.style.left=(Math.random()*100)+"vw";d.style.animationDelay=(Math.random()*.8)+"s";document.body.appendChild(d);setTimeout(()=>d.remove(),3600);}}
-function copyRoomCode(){if(navigator.clipboard)navigator.clipboard.writeText(roomId);else prompt("Xona kodi:",roomId);}
+async function copyRoomCode(){
+  // Maxfiy xona kodi URL ichiga qo‘shiladi: havolani olgan odam shu xona sahifasiga keladi.
+  const inviteUrl=new URL(window.location.href);
+  inviteUrl.searchParams.set("room",String(roomId));
+  const link=inviteUrl.toString();
+  try{
+    if(navigator.clipboard && window.isSecureContext){await navigator.clipboard.writeText(link);alert("✅ Maxfiy xona taklif havolasi nusxalandi. Uni faqat taklif qilgan odamlarga yuboring.");}
+    else prompt("Maxfiy xona taklif havolasini nusxalang:",link);
+  }catch(e){prompt("Maxfiy xona taklif havolasini nusxalang:",link);}
+}
+async function joinPrivateRoomFromInvite(){
+  const params=new URLSearchParams(window.location.search);
+  const code=(params.get("room")||"").trim();
+  if(!/^\d{4}$/.test(code)) return;
+  // Xona kodi URLda bo‘lsa, foydalanuvchidan ism olinadi va maxfiy xona tekshiriladi.
+  let name=(document.getElementById("nameInput")?.value||"").trim();
+  if(!name) name=(prompt("Maxfiy xonaga kirish uchun ismingizni kiriting:")||"").trim();
+  if(!name){alert("Xonaga kirish uchun avval ismingizni kiriting.");return;}
+  document.getElementById("nameInput").value=name;
+  myName=name;
+  const ok=await ensureFirebaseReady();
+  if(!ok)return;
+  try{
+    const snap=await db.ref("rooms/"+code).once("value");
+    const r=snap.val();
+    if(!r||!r.meta||r.meta.visibility!=="private"){
+      alert("Maxfiy xona topilmadi yoki taklif havolasi noto‘g‘ri.");return;
+    }
+    joinRoom(code);
+  }catch(e){console.error(e);alert("Maxfiy xonaga ulanishda xatolik: "+(e.message||e));}
+}
 
 window.addEventListener("load",()=>{
   updateModeHelp();
   console.info("[F-TOPIK] TOPIK II 30 Days bank:", Array.isArray(window.topik30DaysBank) ? window.topik30DaysBank.length : "YUKLANMAGAN");
   initFirebase();
+  const inviteCode=new URLSearchParams(window.location.search).get("room");
+  if(inviteCode) setTimeout(()=>joinPrivateRoomFromInvite(),900);
 });
 </script>
 </body>
