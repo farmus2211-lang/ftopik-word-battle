@@ -167,10 +167,64 @@ button.secondary{background:linear-gradient(135deg,#1b1930,#171629);color:#e7e1f
 @media(max-width:620px){.container{padding:14px 10px 28px}.card{border-radius:19px;padding:16px}.logo{font-size:25px;letter-spacing:.5px}.logo:after{font-size:8px;letter-spacing:3px}.subtitle{font-size:11px;margin-bottom:18px}.answers{grid-template-columns:1fr}.answer{min-height:56px}.word{margin:20px 0}.stats-grid,.profile-grid{grid-template-columns:1fr}.board-row{grid-template-columns:26px minmax(0,1fr) auto auto;padding:9px 8px;gap:6px}.rating-row{grid-template-columns:24px minmax(0,1fr) auto;gap:6px}.rating-row>div:last-child{display:none}.rating-tabs{grid-template-columns:repeat(2,1fr)}.podium{gap:5px}.podium-item{padding:11px 5px}.podium-name{font-size:11px}.room-code{letter-spacing:5px}.room-row{align-items:flex-start}.join-btn{padding:9px 10px}.team-columns{grid-template-columns:1fr}.team-name-row{flex-direction:column}.teacher-summary{grid-template-columns:1fr 1fr}.teacher-summary .teacher-stat:last-child{grid-column:1/-1}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition:none!important}}
 
+
+/* ===== LIGHT MODE ===== */
+.theme-toolbar{display:flex;justify-content:flex-end;align-items:center;gap:6px;margin:0 0 8px}
+.theme-caption{display:none}
+.theme-toggle{width:auto;min-width:0;margin:0;padding:5px 10px;font-size:11px;line-height:1.2;border-radius:6px;letter-spacing:.2px}
+body.light-mode{color-scheme:light;background:linear-gradient(145deg,#f4f6ff 0%,#eef2ff 48%,#f8f5ff 100%);color:#20243a}
+body.light-mode:before{opacity:.35;background-image:linear-gradient(rgba(80,90,130,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(80,90,130,.045) 1px,transparent 1px)}
+body.light-mode .logo{color:#382078;text-shadow:none}
+body.light-mode .logo:after{color:#3975c8}
+body.light-mode .subtitle,body.light-mode .small,body.light-mode .tag,body.light-mode .room-meta,body.light-mode .connection-line,body.light-mode .winner-sub,body.light-mode .rating-summary,body.light-mode .profile-stat{color:#626b83}
+body.light-mode .card{background:rgba(255,255,255,.96);border-color:#dce2f2;box-shadow:0 14px 40px rgba(45,55,100,.10);backdrop-filter:blur(10px)}
+body.light-mode h2,body.light-mode h3,body.light-mode h4,body.light-mode .board-title,body.light-mode .room-title,body.light-mode .board-name,body.light-mode .final-name,body.light-mode .podium-name,body.light-mode .rating-name,body.light-mode .final-player,body.light-mode .team-column h3{color:#252943}
+body.light-mode input,body.light-mode select,body.light-mode textarea{background:#fff;color:#252943;border-color:#cfd6e8}
+body.light-mode input::placeholder,body.light-mode textarea::placeholder{color:#8991a5}
+body.light-mode select option{background:#fff;color:#252943}
+body.light-mode label{color:#59627b}
+body.light-mode button.secondary{background:linear-gradient(135deg,#f0f2fb,#e8ecf8);color:#303854;border-color:#d6dced;box-shadow:none}
+body.light-mode .room-row,body.light-mode .board-row,body.light-mode .rating-row,body.light-mode .final-player,body.light-mode .wait-player,body.light-mode .team-manager,body.light-mode .team-column,body.light-mode .stats,body.light-mode .profile-stat,body.light-mode .podium-item{background:#f7f8fd;color:#30364f;border-color:#dfe4f0}
+body.light-mode .board-row.me,body.light-mode .rating-row.me{background:#eeeaff;border-color:#c9baff}
+body.light-mode .room-title,body.light-mode .score,body.light-mode .rating-points,body.light-mode .final-score,body.light-mode .podium-score,body.light-mode .stats-val,body.light-mode .profile-stat strong{color:#6540c8}
+body.light-mode .status{background:#f0edff;color:#5435a7;border-color:#d9d0ff}
+body.light-mode .badge{background:#eeeaff;color:#5939b3;border-color:#d8ceff}
+body.light-mode .timer{background:#e4e7f0}
+body.light-mode .word{color:#252943;text-shadow:none}
+body.light-mode .answer{background:#fff;color:#30364f;border-color:#d8deed;box-shadow:0 3px 10px rgba(35,45,80,.05)}
+body.light-mode .answer:hover{background:#f1edff;border-color:#9c83ed}
+body.light-mode .answer.correct{background:linear-gradient(135deg,#0b966f,#19b985);color:#fff;border-color:#27d99a}
+body.light-mode .answer.wrong{background:linear-gradient(135deg,#c52e50,#ed4968);color:#fff;border-color:#ff5d79}
+body.light-mode .feedback{color:#30364f}
+body.light-mode .winner{color:#8a6200}
+body.light-mode .podium-item.first{background:#fff8e4;border-color:#ead28c}
+body.light-mode .rating-tab{background:#f0edff;color:#5b43a0;border-color:#ddd5f7}
+body.light-mode .rating-tab.active{background:linear-gradient(120deg,#7544ed,#9a4dff);color:#fff}
+body.light-mode .teacher-stat{background:#f0edff;color:#5d6480;border-color:#ded7f5}
+body.light-mode .teacher-stat strong{color:#6540c8}
+body.light-mode .teacher-table{color:#30364f}
+body.light-mode .teacher-table th{background:#e9e5fa;color:#49358b}
+body.light-mode .teacher-table td{border-color:#e0e4ef}
+body.light-mode .teacher-table tr:hover td{background:#f3f0ff}
+body.light-mode .teacher-note{background:#fff9e9;color:#68572e;border-color:#efe1b8}
+body.light-mode .team-chip{background:#eeeaff;color:#5939b3}
+body.light-mode .team-chip.b{background:#ffe9ed;color:#a32945}
+body.light-mode .rank-progress-card{background:linear-gradient(130deg,#f0edff,#edf7ff);border-color:#d7d3f1}
+body.light-mode .rank-progress-title,body.light-mode .rank-progress-note{color:#343b58}
+body.light-mode .rank-progress-track{background:#e1e5ef}
+body.light-mode .rank-chip{background:#eeeaff;color:#5939b3}
+body.light-mode .public-lobby,body.light-mode .players{border-color:#e0e4ef}
+body.light-mode .divider{border-color:#e0e4ef}
+body.light-mode .profile-history-row,body.light-mode .stats-row{border-color:#e0e4ef}
+body.light-mode .team-column{background:#f8f9fd}
+body.light-mode .team-manager{background:#f6f7fc}
+body.light-mode .rankup-overlay{background:rgba(30,35,60,.55)}
+
 </style>
 </head>
 <body>
 <div class="container">
+  <div class="theme-toolbar"><span class="theme-caption">INTERFACE</span><button id="themeToggle" class="secondary theme-toggle" type="button" onclick="toggleTheme()" aria-label="Rang rejimini almashtirish">light</button></div>
   <div class="logo">🇰🇷 F-TOPIK WORD BATTLE</div>
   <div class="subtitle">1–50 o‘yinchi • 10 / 20 / 30 savol • Firebase real-time</div>
 
@@ -1453,7 +1507,25 @@ async function joinPrivateRoomFromInvite(){
   }catch(e){console.error(e);alert("Maxfiy xonaga ulanishda xatolik: "+(e.message||e));}
 }
 
+function applyTheme(theme){
+  const light=theme==="light";
+  document.body.classList.toggle("light-mode",light);
+  const btn=document.getElementById("themeToggle");
+  if(btn){btn.textContent=light?"dark":"light";btn.setAttribute("aria-pressed",light?"true":"false");}
+  try{localStorage.setItem("ftopik-theme",light?"light":"dark");}catch(e){}
+}
+function toggleTheme(){
+  const next=document.body.classList.contains("light-mode")?"dark":"light";
+  applyTheme(next);
+}
+function initTheme(){
+  let saved="dark";
+  try{saved=localStorage.getItem("ftopik-theme")||"dark";}catch(e){}
+  applyTheme(saved);
+}
+
 window.addEventListener("load",()=>{
+  initTheme();
   updateModeHelp();
   console.info("[F-TOPIK] TOPIK II 30 Days bank:", Array.isArray(window.topik30DaysBank) ? window.topik30DaysBank.length : "YUKLANMAGAN");
   initFirebase();
