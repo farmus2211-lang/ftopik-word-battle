@@ -220,6 +220,54 @@ body.light-mode .team-column{background:#f8f9fd}
 body.light-mode .team-manager{background:#f6f7fc}
 body.light-mode .rankup-overlay{background:rgba(30,35,60,.55)}
 
+
+/* ===== INTERFACE LAYOUT REFINEMENT ===== */
+.container{max-width:980px;padding:22px 20px 48px}
+.theme-toolbar{margin-bottom:2px}
+.logo{margin:10px 0 7px}
+.subtitle{max-width:560px;line-height:1.6;margin-bottom:25px}
+.card{border-radius:22px}
+.start-card{padding:clamp(18px,3vw,30px)}
+.quick-actions{display:flex;justify-content:flex-end;gap:9px;flex-wrap:wrap;margin-bottom:24px}
+.quick-actions button{width:auto;min-width:150px;margin:0;padding:10px 14px;font-size:12px;border-radius:10px}
+.section-heading{padding:0 0 18px;margin-bottom:20px;border-bottom:1px solid var(--line)}
+.section-kicker{display:block;font-size:10px;font-weight:1000;letter-spacing:3px;color:var(--blue);margin-bottom:7px}
+.section-heading h2{font-size:clamp(22px,3vw,28px);margin:0;color:var(--text)}
+.section-heading p{font-size:13px;color:var(--muted);margin:7px 0 0;line-height:1.5}
+.setup-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px 18px;align-items:start}
+.setup-field{min-width:0;padding:14px;border:1px solid var(--line);border-radius:15px;background:rgba(255,255,255,.025)}
+.setup-field label{margin-top:0}
+.setup-field input,.setup-field select{margin-bottom:0}
+.setup-field .small{text-align:left;margin-top:8px}
+.full-field{grid-column:1/-1}
+#xpStakeBox{margin:0}
+#privateCodeBox{margin-top:12px;padding:12px;border:1px dashed var(--line);border-radius:12px}
+.create-room-wrap{padding-top:2px}
+.create-room-btn{margin:0;padding:15px 18px;font-size:15px;letter-spacing:.4px}
+.public-lobby{margin-top:25px;padding-top:22px}
+.public-head h3{font-size:18px}
+.refresh{min-height:36px}
+.rooms-list{grid-template-columns:repeat(2,minmax(0,1fr))}
+.room-row{min-width:0}
+#profileScreen,#teacherScreen,#waitingScreen,#gameScreen,#resultScreen{padding:clamp(17px,3vw,28px)}
+#profileScreen>h2,#teacherScreen>h2,#waitingScreen>h2{margin-bottom:18px}
+#gameScreen .topline{padding-bottom:12px;border-bottom:1px solid var(--line)}
+#gameScreen .players{margin-top:24px}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid rgba(57,197,255,.55);outline-offset:2px}
+body.light-mode .setup-field{background:#f9faff;border-color:#e0e5f1}
+body.light-mode .section-heading{border-color:#e0e5f1}
+body.light-mode .section-heading h2{color:#252943}
+body.light-mode .section-heading p{color:#626b83}
+@media(max-width:680px){
+ .container{padding:14px 11px 30px}
+ .quick-actions{justify-content:stretch;margin-bottom:19px}
+ .quick-actions button{flex:1;min-width:0;padding:10px 8px;font-size:11px}
+ .setup-grid{grid-template-columns:1fr;gap:11px}
+ .full-field{grid-column:1}
+ .rooms-list{grid-template-columns:1fr}
+ .section-heading{margin-bottom:15px}
+}
+
 </style>
 </head>
 <body>
@@ -228,11 +276,22 @@ body.light-mode .rankup-overlay{background:rgba(30,35,60,.55)}
   <div class="logo">🇰🇷 F-TOPIK WORD BATTLE</div>
   <div class="subtitle">1–50 o‘yinchi • 10 / 20 / 30 savol • Firebase real-time</div>
 
-  <div id="startScreen" class="card">
-    <button class="secondary" onclick="openProfile()">👤 Mening profilim</button>
-    <button class="secondary" onclick="openTeacherPanel()">👨‍🏫 O‘qituvchi paneli</button>
-    <h2 style="margin-top:0">🎮 O‘yinni boshlash</h2>
+  <div id="startScreen" class="card start-card">
+    <div class="quick-actions">
+      <button class="secondary" onclick="openProfile()">👤 Mening profilim</button>
+      <button class="secondary" onclick="openTeacherPanel()">👨‍🏫 O‘qituvchi paneli</button>
+    </div>
+    <div class="section-heading">
+      <span class="section-kicker">F-TOPIK ARENA</span>
+      <h2>🎮 O‘yinni boshlash</h2>
+      <p>O‘yin sozlamalarini tanlang va jangga qo‘shiling.</p>
+    </div>
+    <div class="setup-grid">
+    <div class="setup-field full-field">
+    <label for="nameInput">👤 O‘yinchi nomi</label>
     <input id="nameInput" placeholder="Ismingizni kiriting" autocomplete="off">
+    </div>
+    <div class="setup-field">
     <label for="testType">📚 Test turi</label>
     <select id="testType">
       <option value="vocab">📖 TOPIK II lug‘ati</option>
@@ -240,6 +299,8 @@ body.light-mode .rankup-overlay{background:rgba(30,35,60,.55)}
       <option value="topik30days">📘 TOPIK II 30 Days</option>
     </select>
     <div class="small">TOPIK II grammatikasida gapni to‘ldirish uchun to‘g‘ri grammatikani tanlang.</div>
+    </div>
+    <div class="setup-field">
     <label for="battleMode">⚔️ O‘yin rejimi</label>
     <select id="battleMode" onchange="updateModeHelp()">
       <option value="open">🌍 Open Battle — 2–50 o‘yinchi</option>
@@ -252,29 +313,37 @@ body.light-mode .rankup-overlay{background:rgba(30,35,60,.55)}
       <option value="xp_team">💎 XP TEAM BATTLE — 2v2</option>
     </select>
     <div id="modeHelp" class="small">Ochiq xona: 2–50 o‘yinchi.</div>
-    <div id="xpStakeBox" class="hidden">
+    </div>
+    <div id="xpStakeBox" class="hidden setup-field full-field">
       <label for="xpStake">💰 Har bir o‘yinchi tikadigan XP</label>
       <select id="xpStake"><option value="100">100 XP</option><option value="500">500 XP</option><option value="1000">1 000 XP</option><option value="2000">2 000 XP</option><option value="5000">5 000 XP</option><option value="10000">10 000 XP</option><option value="20000">20 000 XP</option></select>
       <div class="small">Mukofot: bankning 75% — 1-o‘rin, 25% — 2-o‘rin. XP o‘yin boshlanishida yechiladi.</div>
     </div>
+    <div class="setup-field">
     <label for="questionMode">🎯 Savollar soni</label>
     <select id="questionMode">
       <option value="10">10 ta savol</option>
       <option value="20">20 ta savol</option>
       <option value="30">30 ta savol</option>
     </select>
+    </div>
+    <div class="setup-field">
     <label for="roomVisibility">🔐 Xona turi</label>
     <select id="roomVisibility" onchange="togglePrivateRoomCode()">
       <option value="public">🌐 Ochiq xona — hamma qo‘shila oladi</option>
       <option value="private">🔒 Kodli xona — faqat kod bilan</option>
     </select>
-    <div id="privateCodeBox" class="hidden">
+    <div id="privateCodeBox" class="hidden full-field">
       <label for="privateRoomCode">O‘zingiz tanlagan 4 xonali kod</label>
       <input id="privateRoomCode" inputmode="numeric" maxlength="4" placeholder="Masalan: 2580" autocomplete="off">
       <div class="small">Bu kodni do‘stlaringizga yuboring. Xona ochiq ro‘yxatda ko‘rinmaydi.</div>
     </div>
-    <button onclick="createRoom()">🏠 Xona yaratish</button>
+    </div>
+    <div class="create-room-wrap full-field">
+    <button class="create-room-btn" onclick="createRoom()">🏠 Xona yaratish</button>
     <div class="small" style="margin-top:10px">🔒 Maxfiy xonaga faqat xona egasi yuborgan taklif havolasi orqali kiriladi.</div>
+    </div>
+    </div><!-- /setup-grid -->
 
     <div class="public-lobby">
       <div class="public-head">
