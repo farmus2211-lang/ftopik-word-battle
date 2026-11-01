@@ -200,7 +200,7 @@ button.secondary{background:linear-gradient(135deg,#1b1930,#171629);color:#e7e1f
     <div id="modeHelp" class="small">Ochiq xona: 2–50 o‘yinchi.</div>
     <div id="xpStakeBox" class="hidden">
       <label for="xpStake">💰 Har bir o‘yinchi tikadigan XP</label>
-      <select id="xpStake"><option value="100">100 XP</option><option value="500">500 XP</option><option value="1000">1 000 XP</option><option value="2000">2 000 XP</option><option value="5000">5 000 XP</option></select>
+      <select id="xpStake"><option value="100">100 XP</option><option value="500">500 XP</option><option value="1000">1 000 XP</option><option value="2000">2 000 XP</option><option value="5000">5 000 XP</option><option value="10000">10 000 XP</option><option value="20000">20 000 XP</option></select>
       <div class="small">Mukofot: bankning 75% — 1-o‘rin, 25% — 2-o‘rin. XP o‘yin boshlanishida yechiladi.</div>
     </div>
     <label for="questionMode">🎯 Savollar soni</label>
@@ -379,7 +379,7 @@ function xpModeCapacity(mode){return ({xp_duel:2,xp_triple:3,xp_ffa:4,xp_team:4}
 function isTeamMode(mode){return mode==="team"||mode==="xp_team";}
 function updateModeHelp(){
   const mode=document.getElementById("battleMode")?.value||"open";
-  const help={open:"🌍 Open Battle: 2–50 o‘yinchi, har kim individual ball to‘playdi.",duel:"⚔️ 1 vs 1: aynan 2 o‘yinchi bellashadi.",team:"👥 Team Battle: o‘yinchilar ikki jamoaga bo‘linadi.",boss:"👑 Boss Battle: 30 ta savol, har savolga 10 soniya.",xp_duel:"💎 XP DUEL: 2 o‘yinchi. 1-o‘rin 75%, 2-o‘rin 25% bankni oladi.",xp_triple:"💎 XP TRIPLE BATTLE: 3 o‘yinchi. 1-o‘rin 75%, 2-o‘rin 25%.",xp_ffa:"💎 XP FREE-FOR-ALL: 4 o‘yinchi, har kim o‘zi uchun.",xp_team:"💎 XP TEAM BATTLE: 2v2; g‘olib jamoa 75%, ikkinchi jamoa 25% oladi."};
+  const help={open:"🌍 Open Battle: 2–50 o‘yinchi, har kim individual ball to‘playdi.",duel:"⚔️ 1 vs 1: aynan 2 o‘yinchi bellashadi.",team:"👥 Team Battle: o‘yinchilar ikki jamoaga bo‘linadi.",boss:"👑 Boss Battle: 30 ta savol, har savolga 10 soniya.",xp_duel:"💎 XP DUEL: 2 o‘yinchi. G‘olib ikkala tikilgan XP’ni oladi, durangda XP qaytariladi.",xp_triple:"💎 XP TRIPLE BATTLE: 3 o‘yinchi. 1-o‘rin 75%, 2-o‘rin 25%.",xp_ffa:"💎 XP FREE-FOR-ALL: 4 o‘yinchi, har kim o‘zi uchun.",xp_team:"💎 XP TEAM BATTLE: 2v2; g‘olib jamoa 75%, ikkinchi jamoa 25% oladi."};
   const el=document.getElementById("modeHelp");if(el)el.textContent=help[mode]||help.open;
   const stake=document.getElementById("xpStakeBox");if(stake)stake.classList.toggle("hidden",!isXPMode(mode));
   const q=document.getElementById("questionMode");if(q&&mode==="boss")q.value="30";
@@ -695,6 +695,7 @@ function createRoom(){
   if(battleMode==="boss")questionCount=30;
   if(!myName){alert("Avval ismingizni kiriting!");resetCreateRoomButton();return;}
   const xpStake=isXPMode(battleMode)?Number(document.getElementById("xpStake")?.value||100):0;
+  window.__roomStake=xpStake;
   ensureFirebaseReady().then(async function(ok){
     if(!ok){resetCreateRoomButton();return;}
     try{
@@ -773,7 +774,7 @@ function joinRoom(id){
     const count=Object.keys(r.players||{}).length;
     const mode=r.meta.mode||"open";const limit=Number(r.meta.maxPlayers)||(isXPMode(mode)?xpModeCapacity(mode):(mode==="duel"?2:MAX_PLAYERS));
     if(count>=limit){alert("Xona to‘ldi ("+limit+"/"+limit+").");return;}
-    battleMode=mode;questionCount=Number(r.meta.questionCount)||10;
+    battleMode=mode;questionCount=Number(r.meta.questionCount)||10;window.__roomStake=Number(r.meta.xpStake)||0;
     const modeSelect=document.getElementById("battleMode");if(modeSelect)modeSelect.value=mode;
     const qSelect=document.getElementById("questionMode");if(qSelect)qSelect.value=String(questionCount);
     const p=createPlayer(myName);if(isTeamMode(mode))p.team=(count%2===0?"A":"B");
@@ -849,6 +850,8 @@ function renderWaitingPlayers(){
   const box=document.getElementById("waitingPlayers"); if(!box)return;
   const list=Object.keys(players||{}).map(id=>({id,...players[id]})).filter(p=>p.connected!==false);
   const mode=battleMode||currentState?.mode||"open";
+  const stakeInfo=isXPMode(mode)?Number(currentState?.xpBattle?.stake||window.__roomStake||0):0;
+  if(isXPMode(mode)){const info=document.getElementById("waitingStatus");if(info&&currentState?.phase==="waiting")info.textContent="💎 Har bir o‘yinchi tikadi: "+formatXP(stakeInfo||Number(window.__roomStake||0)) +" XP. O‘yin boshlanganda balansdan yechiladi.";}
   if(isTeamMode(mode)){
     const a=list.filter(p=>p.team==="A"), b=list.filter(p=>p.team==="B");
     box.innerHTML='<div class="team-columns"><div class="team-column"><h3>🔵 '+escapeHtml(teamNames.A)+' ('+a.length+')</h3>'+a.map(p=>'<div class="team-member"><span>'+(p.id===uidKey()?'⭐ ':'👤 ')+escapeHtml(p.name)+(p.id===uidKey()?' (siz)':'')+'</span>'+(isHost&&currentState?.phase!=="game"?'<select aria-label="Jamoa" onchange="movePlayerTeam(\''+p.id+'\',this.value)"><option value="A" '+(p.team==="A"?'selected':'')+'>A jamoa</option><option value="B" '+(p.team==="B"?'selected':'')+'>B jamoa</option></select>':'<span class="team-chip">A</span>')+'</div>').join('')+'</div><div class="team-column"><h3>🔴 '+escapeHtml(teamNames.B)+' ('+b.length+')</h3>'+b.map(p=>'<div class="team-member"><span>'+(p.id===uidKey()?'⭐ ':'👤 ')+escapeHtml(p.name)+(p.id===uidKey()?' (siz)':'')+'</span>'+(isHost&&currentState?.phase!=="game"?'<select aria-label="Jamoa" onchange="movePlayerTeam(\''+p.id+'\',this.value)"><option value="A" '+(p.team==="A"?'selected':'')+'>A jamoa</option><option value="B" '+(p.team==="B"?'selected':'')+'>B jamoa</option></select>':'<span class="team-chip b">B</span>')+'</div>').join('')+'</div></div>';
@@ -860,7 +863,7 @@ function renderWaitingPlayers(){
     const staking=currentState?.phase==="staking"||currentState?.phase==="staking_failed";
     start.classList.toggle("hidden",staking);start.disabled=staking||list.length<2;
     if(staking)document.getElementById("waitingStatus").textContent=currentState.phase==="staking_failed"?"❌ XP tikish bekor qilindi. XP qaytarilmoqda...":"💎 Har bir o‘yinchining XP tikishi tasdiqlanmoqda...";
-    else document.getElementById("waitingStatus").textContent=list.length>=2?`✅ ${list.length} o‘yinchi tayyor. Boshlash mumkin!`:`⏳ Kamida 2 o‘yinchi kerak.`;
+    else document.getElementById("waitingStatus").textContent=(isXPMode(mode)?"💎 Tikish: "+formatXP(stakeInfo||Number(window.__roomStake||0))+" XP / har bir o‘yinchi. ":"")+ (list.length>=2?`✅ ${list.length} o‘yinchi tayyor. Boshlash mumkin!`:`⏳ Kamida 2 o‘yinchi kerak.`);
   }
 }
 function saveTeamNames(){
@@ -900,7 +903,9 @@ async function startGame(){
   const d=serverNow()+(mode==="boss"?10:GAME_TIME)*1000;
   const state={phase:isXPMode(mode)?"staking":"game",currentQuestion:0,questionCount,mode,testType,deadline:d,questions:publicQuestions(qs),revealQuestion:-1,revealCorrect:null};
   const roomLimit=isXPMode(mode)?xpModeCapacity(mode):(mode==="duel"?2:MAX_PLAYERS);
-  const xpStake=isXPMode(mode)?Number(document.getElementById("xpStake")?.value||100):0;
+  const roomMetaSnap=await roomRef.child("meta").once("value");
+  const savedRoomMeta=roomMetaSnap.val()||{};
+  const xpStake=isXPMode(mode)?Math.max(100,Number(savedRoomMeta.xpStake)||Number(document.getElementById("xpStake")?.value)||100):0;
   const xpBattle=isXPMode(mode)?{enabled:true,stake:xpStake,pot:xpStake*countNow,settled:false,participants:Object.keys(players),acks:{},startedAt:Date.now()}:null;
   const meta={roomId,hostUid:uidKey(),hostName:safeName(),questionCount,mode,testType,maxPlayers:roomLimit,xpStake,playersCount:Object.keys(players).length,started:true,teamNames,createdAt:firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP};
   roomRef.update({meta,players:resetPlayers,state:Object.assign({},state,xpBattle?{xpBattle}:{}),answers:{}})
@@ -1327,7 +1332,11 @@ async function settleXPBattle(state,list){
   const me=list.find(p=>p.uid===uidKey());if(!me)return;
   const participants=state.xpBattle.participants||list.map(p=>p.uid);const pot=stake*participants.length;
   const awards={};
-  if(state.mode==="xp_team"){
+  if(state.mode==="xp_duel" && list.length===2){
+    const sorted=[...list].sort((a,b)=>Number(b.score||0)-Number(a.score||0));
+    if(Number(sorted[0].score||0)===Number(sorted[1].score||0)){sorted.forEach(p=>awards[p.uid]=stake);}
+    else {awards[sorted[0].uid]=pot;awards[sorted[1].uid]=0;}
+  }else if(state.mode==="xp_team"){
     const totals={A:0,B:0};list.forEach(p=>{const t=(players[p.uid]||{}).team;if(t)totals[t]+=Number(p.score)||0;});
     if(totals.A===totals.B){list.forEach(p=>awards[p.uid]=stake);}
     else{const win=totals.A>totals.B?"A":"B",lose=win==="A"?"B":"A";const winners=list.filter(p=>(players[p.uid]||{}).team===win),losers=list.filter(p=>(players[p.uid]||{}).team===lose);const a=Math.floor(pot*.75),b=pot-a;winners.forEach((p,i)=>awards[p.uid]=Math.floor(a/Math.max(1,winners.length))+(i===0?a%Math.max(1,winners.length):0));losers.forEach((p,i)=>awards[p.uid]=Math.floor(b/Math.max(1,losers.length))+(i===0?b%Math.max(1,losers.length):0));}
@@ -1417,7 +1426,7 @@ function showResultFromState(state){
   } else {
     document.getElementById("trophy").textContent=tie?'🤝':'🏆';
     document.getElementById("winner").textContent=tie?'🤝 Durrang!':'🏆 '+list[0].name+' g‘olib!';
-    document.getElementById("winnerSub").textContent=mode==="boss"?'👑 Boss Battle yakunlandi! Eng yuqori ball g‘olib bo‘ldi.':(tie?'Teng natija.':'Ajoyib natija! 🎉');
+    document.getElementById("winnerSub").textContent=(mode==="xp_duel"?"💎 Tikish: "+formatXP(Number(state.xpBattle?.stake)||0)+" XP · G‘olibga: "+formatXP(Number(state.xpBattle?.stake||0)*2)+" XP"+(tie?" · Durangda tikish qaytariladi.":" · Mukofot balansga qo‘shiladi."):mode==="boss"?'👑 Boss Battle yakunlandi! Eng yuqori ball g‘olib bo‘ldi.':(tie?'Teng natija.':'Ajoyib natija! 🎉'));
   }
   renderPodium(list);
   renderMyRankProgress(Number((rankCache[uidKey()]||{}).points)||0);
