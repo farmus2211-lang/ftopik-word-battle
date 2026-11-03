@@ -10,7 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-database-compat.js"></script>
 <script src="firebase-config.js?v=20261010"></script>
 <script src="questions.js?v=20261010"></script>
-<script src="grammars.js?v=20261010"></script>
+<script src="grammars.js?v=20261103-synonyms"></script>
 <script src="topik30days.js?v=20261014-2"></script>
 
 <style>
@@ -296,6 +296,7 @@ body.light-mode .section-heading p{color:#626b83}
     <select id="testType">
       <option value="vocab">📖 TOPIK II lug‘ati</option>
       <option value="grammar">✍️ TOPIK II grammatikasi</option>
+      <option value="grammar_synonym">🔁 TOPIK II grammatikalari (sinonim)</option>
       <option value="topik30days">📘 TOPIK II 30 Days</option>
     </select>
     <div class="small">TOPIK II grammatikasida gapni to‘ldirish uchun to‘g‘ri grammatikani tanlang.</div>
@@ -519,7 +520,7 @@ function shuffleArray(list){
   return out;
 }
 function questionKey(item,type){
-  if(type==="grammar") return String(item.grammar||"").trim();
+  if(type==="grammar" || type==="grammar_synonym") return String(item.grammar||"").trim();
   if(type==="topik30days") return String(item.korean||"").trim();
   return String(item.korean||"").trim();
 }
@@ -558,6 +559,31 @@ function generateQuestions(count){
       const answers=shuffleArray([item.grammar,...distractors]);
       return {word:item.meaning,answers,correct:item.grammar};
     });
+  }
+
+  if(type === "grammar_synonym"){
+    const bank = Array.isArray(window.grammarSynonymBank) ? window.grammarSynonymBank : [];
+    // Sinonimi bor grammatikalargina testga kiritiladi.
+    const usable = bank.filter(item =>
+      item && typeof item.grammar === "string" && item.grammar.trim() &&
+      Array.isArray(item.synonyms) && item.synonyms.some(s => typeof s === "string" && s.trim())
+    );
+    if(!usable.length) return [];
+    const allSynonyms = [...new Set(usable.flatMap(item => item.synonyms)
+      .filter(s => typeof s === "string" && s.trim()))];
+    const selected = selectFreshItems(usable,nWanted,type);
+    return selected.map(item => {
+      const validSynonyms = [...new Set(item.synonyms.filter(s =>
+        typeof s === "string" && s.trim()
+      ))];
+      const correct = validSynonyms[Math.floor(Math.random() * validSynonyms.length)];
+      // Shu savol uchun boshqa to‘g‘ri sinonimlar distractor bo‘lib chiqmasin.
+      const currentSynonyms = new Set(validSynonyms);
+      const distractors = shuffleArray(allSynonyms.filter(s =>
+        s !== correct && !currentSynonyms.has(s)
+      )).slice(0,3);
+      return {word:item.grammar,answers:shuffleArray([correct,...distractors]),correct};
+    }).filter(q => q.answers.length === 4);
   }
 
   if(type === "topik30days"){
