@@ -12,6 +12,7 @@
 <script src="questions.js?v=20261103-1"></script>
 <script src="grammars.js?v=20261103-synonyms"></script>
 <script src="topik30days.js?v=20261014-2"></script>
+<script src="sejong1a.js?v=20261120-1"></script>
 
 <style>
 *{box-sizing:border-box}
@@ -293,13 +294,24 @@ body.light-mode .section-heading p{color:#626b83}
     </div>
     <div class="setup-field">
     <label for="testType">📚 Test turi</label>
-    <select id="testType">
+    <select id="testType" onchange="toggleSejongLessonField()">
       <option value="vocab">📖 TOPIK II lug‘ati</option>
       <option value="grammar">✍️ TOPIK II grammatikasi</option>
       <option value="grammar_synonym">🔁 TOPIK II grammatikalari (sinonim)</option>
       <option value="topik30days">📘 TOPIK II 30 Days</option>
+      <option value="sejong1a">📗 Sejong Korean 1A lug‘ati</option>
     </select>
     <div class="small">TOPIK II grammatikasida gapni to‘ldirish uchun to‘g‘ri grammatikani tanlang.</div>
+    </div>
+    <div id="sejongLessonField" class="setup-field hidden">
+      <label for="sejongLesson">📖 Sejong Korean 1A — dars</label>
+      <select id="sejongLesson">
+        <option value="all">1–6-darslar (barchasi)</option>
+        <option value="1">1-dars</option><option value="2">2-dars</option>
+        <option value="3">3-dars</option><option value="4">4-dars</option>
+        <option value="5">5-dars</option><option value="6">6-dars</option>
+      </select>
+      <div class="small">Faqat tanlangan dars lug‘atlaridan savollar tuziladi.</div>
     </div>
     <div class="setup-field">
     <label for="battleMode">⚔️ O‘yin rejimi</label>
@@ -544,6 +556,11 @@ function selectFreshItems(items,count,type){
   try{localStorage.setItem(key,JSON.stringify([...new Set(nextRecent)].slice(0,Math.max(count*2,40))));}catch(e){}
   return result;
 }
+function toggleSejongLessonField(){
+  const type=document.getElementById("testType")?.value;
+  const field=document.getElementById("sejongLessonField");
+  if(field) field.classList.toggle("hidden",type!=="sejong1a");
+}
 function generateQuestions(count){
   const type = document.getElementById("testType")?.value || testType || "vocab";
   testType = type;
@@ -591,6 +608,20 @@ function generateQuestions(count){
     const usable = bank.filter(item => item && typeof item.korean === "string" && item.korean.trim() && typeof item.uzbek === "string" && item.uzbek.trim());
     if(!usable.length) return [];
     return selectFreshItems(usable,nWanted,type).map(item => {
+      const wrong=shuffleArray(usable.filter(x=>x.uzbek!==item.uzbek)).slice(0,3).map(x=>x.uzbek);
+      return {word:item.korean,answers:shuffleArray([item.uzbek,...wrong]),correct:item.uzbek};
+    });
+  }
+
+  if(type === "sejong1a"){
+    const bankByLesson = window.sejong1aBank && typeof window.sejong1aBank === "object" ? window.sejong1aBank : {};
+    const lesson = document.getElementById("sejongLesson")?.value || "all";
+    const source = lesson === "all"
+      ? Object.values(bankByLesson).flat()
+      : (Array.isArray(bankByLesson[lesson]) ? bankByLesson[lesson] : []);
+    const usable = source.filter(item => item && typeof item.korean === "string" && item.korean.trim() && typeof item.uzbek === "string" && item.uzbek.trim());
+    if(!usable.length) return [];
+    return selectFreshItems(usable,nWanted,"sejong1a_"+lesson).map(item=>{
       const wrong=shuffleArray(usable.filter(x=>x.uzbek!==item.uzbek)).slice(0,3).map(x=>x.uzbek);
       return {word:item.korean,answers:shuffleArray([item.uzbek,...wrong]),correct:item.uzbek};
     });
@@ -1024,7 +1055,9 @@ async function startGame(){
       ? "grammars.js faylida yetarli grammatika savollari yo‘q. Kamida "+questionCount+" ta savol kiriting."
       : testType==="topik30days"
         ? "topik30days.js faylida yetarli lug‘at yo‘q yoki fayl yuklanmagan. Kamida "+questionCount+" ta lug‘at kerak."
-        : "Savollarni yaratib bo‘lmadi.";
+        : testType==="sejong1a"
+          ? "sejong1a.js faylida tanlangan dars uchun yetarli lug‘at yo‘q. Savollar sonini kamaytiring yoki boshqa darsni tanlang."
+          : "Savollarni yaratib bo‘lmadi.";
     alert(message);return;
   }
   const resetPlayers={}; Object.keys(players).forEach(id=>{ const p=Object.assign(createPlayer(players[id].name),players[id]); p.score=0;p.combo=0;p.maxCombo=0;p.correct=0;p.wrong=0;p.fastBonus=0;p.answerTime=0;p.answers=0;p.answered=false;p.connected=true;p.lastQuestion=-1;p.lastCorrect=null; resetPlayers[id]=p; });
@@ -1133,7 +1166,7 @@ function renderQuestion(q){
   if(!q)return;
   window.__ftopikSelectedAnswer=undefined;
   answered=false;
-  document.getElementById("questionNumber").textContent=(currentQuestion+1)+" / "+questionCount+(currentState?.mode?" · "+modeLabel(currentState.mode):"")+(currentState?.testType==="grammar"?" · TOPIK II grammatika":currentState?.testType==="topik30days"?" · TOPIK II 30 Days":"");
+  document.getElementById("questionNumber").textContent=(currentQuestion+1)+" / "+questionCount+(currentState?.mode?" · "+modeLabel(currentState.mode):"")+(currentState?.testType==="grammar"?" · TOPIK II grammatika":currentState?.testType==="topik30days"?" · TOPIK II 30 Days":currentState?.testType==="sejong1a"?" · Sejong Korean 1A":"");
   document.getElementById("word").textContent=q.word;
   document.getElementById("feedback").textContent="";
   const box=document.getElementById("answers");
@@ -1619,6 +1652,7 @@ function initTheme(){
 window.addEventListener("load",()=>{
   initTheme();
   updateModeHelp();
+  toggleSejongLessonField();
   console.info("[F-TOPIK] TOPIK II 30 Days bank:", Array.isArray(window.topik30DaysBank) ? window.topik30DaysBank.length : "YUKLANMAGAN");
   initFirebase();
   const inviteCode=new URLSearchParams(window.location.search).get("room");
